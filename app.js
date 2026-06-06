@@ -174,7 +174,11 @@ function renderRegisterForm(isTeacher) {
         <div class="field"><label>${isTeacher ? "教學班級" : "班級"}</label><input name="className" placeholder="例：六年一班" required /></div>
         ${isTeacher ? "" : '<div class="field"><label>座號</label><input name="seat" placeholder="例：08" required /></div>'}
         <div class="field ${isTeacher ? "" : ""}"><label>真實姓名</label><input name="realName" placeholder="僅教師與管理員可見" required /></div>
-        <div class="field ${isTeacher ? "" : "full"}"><label>${isTeacher ? "教師帳號" : "玩家帳號（同時為遊戲名稱）"}</label><input name="account" autocomplete="username" placeholder="${isTeacher ? "設定下次登入帳號" : "設定登入與公開顯示名稱"}" required /></div>
+        <div class="field ${isTeacher ? "" : "full"}">
+          <label>${isTeacher ? "教師帳號" : "玩家帳號"}</label>
+          <input name="account" autocomplete="username" placeholder="設定下次登入帳號" required />
+          ${isTeacher ? "" : '<small style="color:var(--muted)">玩家帳號將直接作為遊戲中的公開顯示名稱。</small>'}
+        </div>
         <div class="field"><label>密碼</label><input name="password" type="password" autocomplete="new-password" minlength="${Cloud.isConfigured() ? 8 : 4}" placeholder="至少 ${Cloud.isConfigured() ? 8 : 4} 個字元" required /></div>
         <div class="field full"><label>再次確認密碼</label><input name="confirmPassword" type="password" autocomplete="new-password" required /></div>
       </div>
@@ -218,8 +222,8 @@ function renderSidebar(user, isTeacher) {
         <button id="logout"><span class="nav-icon">↪</span>登出</button>
       </nav>
       <div class="sidebar-user">
-        <span class="avatar">${escapeHTML((user.displayName || user.realName).slice(0, 1))}</span>
-        <div><strong>${escapeHTML(user.displayName || user.realName)}</strong><small>${isTeacher ? `${user.className} 教師` : `Lv.${user.level || 1} 探索者`}</small></div>
+        <span class="avatar">${escapeHTML((isTeacher ? user.realName : user.account).slice(0, 1))}</span>
+        <div><strong>${escapeHTML(isTeacher ? user.realName : user.account)}</strong><small>${isTeacher ? `${user.className} 教師` : `Lv.${user.level || 1} 探索者`}</small></div>
       </div>
     </aside>`;
 }
@@ -246,7 +250,7 @@ function renderPlayerPage(user) {
 
 function renderPlayerHome(user) {
   return `
-    ${playerHeader(user, `嗨，${escapeHTML(user.displayName)}！`, "今天也和 Toki 一起前進一點吧。")}
+    ${playerHeader(user, `嗨，${escapeHTML(user.account)}！`, "今天也和 Toki 一起前進一點吧。")}
     <section class="dashboard-grid">
       <article class="card hero-card">
         <span class="eyebrow">今日主線任務</span>
@@ -379,7 +383,7 @@ function renderAbility(user) {
     <section class="ability-page">
       <article class="card profile-card">
         <div class="profile-orb"><img src="assets/toki.png" alt="Toki 夥伴" /></div>
-        <h2>${escapeHTML(user.displayName)}</h2>
+        <h2>${escapeHTML(user.account)}</h2>
         <p style="color:var(--muted)">Lv.${user.level}｜城市探索者｜CEFR A1-2</p>
         <div class="radar-wrap">${radarSVG()}</div>
         <b>本週整體語力提升 8%</b>
