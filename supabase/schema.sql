@@ -78,7 +78,10 @@ begin
     new.raw_user_meta_data ->> 'class_name',
     nullif(new.raw_user_meta_data ->> 'seat', ''),
     new.raw_user_meta_data ->> 'real_name',
-    nullif(new.raw_user_meta_data ->> 'display_name', ''),
+    case
+      when new_role = 'player' then lower(new.raw_user_meta_data ->> 'account')
+      else nullif(new.raw_user_meta_data ->> 'display_name', '')
+    end,
     new_role <> 'teacher'
   );
 

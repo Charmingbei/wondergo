@@ -61,7 +61,7 @@ const Cloud = (() => {
         className: values.className,
         seat: values.seat || "",
         realName: values.realName,
-        displayName: values.displayName || "",
+        displayName: role === "player" ? values.account : "",
       }),
     });
     return login(values.account, values.password);
@@ -139,7 +139,7 @@ const Cloud = (() => {
         id: profile.id,
         account: profile.account,
         name: profile.real_name,
-        player: profile.display_name,
+        player: profile.account,
         seat: profile.seat,
         level: profile.cefr_level,
         xp: profile.xp,
@@ -188,7 +188,7 @@ const Cloud = (() => {
       className: profile.class_name,
       seat: profile.seat,
       realName: profile.real_name,
-      displayName: profile.display_name,
+      displayName: profile.role === "player" ? profile.account : profile.display_name,
       xp: profile.xp,
       level: profile.adventure_level,
       cefrLevel: profile.cefr_level,

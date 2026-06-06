@@ -26,7 +26,7 @@ const defaultData = {
       className: "六年一班",
       seat: "08",
       realName: "林小晴",
-      displayName: "晴空飛行員",
+      displayName: "player",
       xp: 1380,
       level: 12,
     },
@@ -174,8 +174,7 @@ function renderRegisterForm(isTeacher) {
         <div class="field"><label>${isTeacher ? "教學班級" : "班級"}</label><input name="className" placeholder="例：六年一班" required /></div>
         ${isTeacher ? "" : '<div class="field"><label>座號</label><input name="seat" placeholder="例：08" required /></div>'}
         <div class="field ${isTeacher ? "" : ""}"><label>真實姓名</label><input name="realName" placeholder="僅教師與管理員可見" required /></div>
-        ${isTeacher ? "" : '<div class="field"><label>玩家名稱</label><input name="displayName" placeholder="遊戲內公開名稱" required /></div>'}
-        <div class="field"><label>${isTeacher ? "教師" : "玩家"}帳號</label><input name="account" autocomplete="username" placeholder="設定下次登入帳號" required /></div>
+        <div class="field ${isTeacher ? "" : "full"}"><label>${isTeacher ? "教師帳號" : "玩家帳號（同時為遊戲名稱）"}</label><input name="account" autocomplete="username" placeholder="${isTeacher ? "設定下次登入帳號" : "設定登入與公開顯示名稱"}" required /></div>
         <div class="field"><label>密碼</label><input name="password" type="password" autocomplete="new-password" minlength="${Cloud.isConfigured() ? 8 : 4}" placeholder="至少 ${Cloud.isConfigured() ? 8 : 4} 個字元" required /></div>
         <div class="field full"><label>再次確認密碼</label><input name="confirmPassword" type="password" autocomplete="new-password" required /></div>
       </div>
