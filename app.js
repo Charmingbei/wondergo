@@ -424,27 +424,40 @@ function renderPlayerPage(user) {
 function renderPlayerHome(user) {
   return `
     ${playerHeader(user, `嗨，${escapeHTML(user.account)}！`, "今天也和 Toki 一起前進一點吧。")}
-    ${renderTrainingMap(user)}
-    ${renderMissions()}`;
+    ${renderMissions()}
+    ${renderTrainingMap(user)}`;
 }
 
 function renderTrainingMap(user) {
   return `
     <section class="training-map">
+      <div class="map-sky" aria-hidden="true">
+        <span class="map-sun">☀</span>
+        <span class="map-cloud cloud-one"></span>
+        <span class="map-cloud cloud-two"></span>
+        <span class="map-star star-one">✦</span>
+        <span class="map-star star-two">✦</span>
+      </div>
       <div class="map-heading">
         <div>
           <span class="mission-tag">WonderGo 冒險區域</span>
           <h2>五大能力訓練館</h2>
           <p>Toki 已依照你的 ${escapeHTML(user.cefrLevel || "Pre-A1")} 程度準備任務。選一座場館，完成 10 題獲得 XP！</p>
         </div>
-        <img src="assets/toki.png" alt="Toki 指引訓練館地圖" />
+        <div class="toki-guide">
+          <span>選一座場館出發吧！</span>
+          <img src="assets/toki.png" alt="Toki 指引訓練館地圖" />
+        </div>
       </div>
+      <div class="map-land land-left" aria-hidden="true"></div>
+      <div class="map-land land-right" aria-hidden="true"></div>
       <div class="map-path" aria-hidden="true"></div>
       <div class="map-locations">
         ${abilities.map((ability, index) => `
           <button class="map-location location-${index + 1}" data-ability="${ability.id}" style="--hall-color:${ability.color}">
+            <span class="hall-island" aria-hidden="true"></span>
             <span class="map-pin">${index + 1}</span>
-            <span class="hall-art">${ability.scene}</span>
+            <span class="hall-art"><i>${ability.scene}</i></span>
             <span class="hall-copy">
               <strong>${ability.name}</strong>
               <small>${ability.description}</small>
@@ -462,17 +475,22 @@ function renderMissions() {
     ["challenge", "極限挑戰", "語序機關迷宮", "重新組合句子，破解高難度的語言機關。", "句型排列題"],
   ];
   return `
-    <div class="section-title"><div><h2>今日推薦</h2><p>Toki 根據你的能力表現安排了三組不同題目。</p></div></div>
-    <section class="mission-grid">
-      ${missions.map((mission) => `<article class="card mission"><div class="mission-head"><span class="mission-tag">${mission[1]}</span><b>${mission[4]}</b></div><h3>${mission[2]}</h3><p>${mission[3]}</p><button class="secondary-btn mission-game" data-mission="${mission[0]}">前往任務</button></article>`).join("")}
+    <section class="daily-quests">
+      <div class="section-title">
+        <div><span class="quest-eyebrow">TODAY'S QUEST</span><h2>今日推薦</h2><p>Toki 根據你的能力表現安排了三組不同題目。</p></div>
+        <span class="quest-reward">完成任務賺取 XP ✦</span>
+      </div>
+      <div class="mission-grid">
+        ${missions.map((mission, index) => `<article class="card mission mission-${index + 1}"><span class="mission-number">0${index + 1}</span><div class="mission-head"><span class="mission-tag">${mission[1]}</span><b>${mission[4]}</b></div><h3>${mission[2]}</h3><p>${mission[3]}</p><button class="secondary-btn mission-game" data-mission="${mission[0]}">前往任務 <span>→</span></button></article>`).join("")}
+      </div>
     </section>`;
 }
 
 function renderTraining(user) {
   return `
     ${playerHeader(user, "五大能力訓練館", "每座場館依照你的程度提供 10 題國小英語練習。")}
-    ${renderTrainingMap(user)}
-    ${renderMissions()}`;
+    ${renderMissions()}
+    ${renderTrainingMap(user)}`;
 }
 
 function radarSVG(values = abilities) {
