@@ -220,6 +220,7 @@ let authMode = "login";
 let currentPage = "home";
 let selectedStudent = 0;
 let cloudStudents = [];
+let staffDashboard = null;
 let gameState = null;
 
 if (Cloud.isConfigured() && data.currentUser) {
@@ -284,7 +285,8 @@ function activeStudents() {
 async function refreshTeacherStudents(user) {
   if (!user?.cloud || !isStaffRole(user.role)) return;
   try {
-    cloudStudents = await Cloud.loadClassStudents(user.school, user.className);
+    staffDashboard = await Cloud.loadStaffDashboard();
+    cloudStudents = staffDashboard.students;
   } catch (error) {
     toast(`學生資料同步失敗：${error.message}`);
   }
@@ -430,7 +432,13 @@ function renderSidebar(user, isTeacher) {
     ["content", "◇", "教材管理"],
     ["analytics", "⌁", "教學成效"],
   ];
-  const nav = isTeacher ? teacherNav : playerNav;
+  const adminNav = [
+    ["overview", "▦", "平台總覽"],
+    ["accounts", "♙", "帳號與申請"],
+    ["classes", "⌂", "班級配對"],
+    ["analytics", "⌁", "全平台學習成效"],
+  ];
+  const nav = user.role === "admin" ? adminNav : isTeacher ? teacherNav : playerNav;
   return `
     <aside class="sidebar">
       <div class="logo"><span class="logo-mark">W</span> WonderGo</div>
@@ -662,19 +670,117 @@ function renderComingSoon(user, title, subtitle, body, icon) {
 }
 
 function teacherHeader(user, title, subtitle) {
+  const scope = user.role === "admin"
+    ? "全平台管理中心"
+    : `${escapeHTML(user.school)}・${escapeHTML(user.className)}`;
   return `
     <header class="topbar">
-      <div><h1>${title}</h1><p>${escapeHTML(user.school)}・${escapeHTML(user.className)}｜${subtitle}</p></div>
-      <button class="primary-btn mission-action">＋ 指派新任務</button>
+      <div><h1>${title}</h1><p>${scope}｜${subtitle}</p></div>
+      ${user.role === "admin" ? "" : '<button class="primary-btn mission-action">＋ 指派新任務</button>'}
     </header>`;
 }
 
 function renderTeacherPage(user) {
+  if (user.role === "admin") return renderAdminPage(user);
   if (currentPage === "students") return renderStudents(user);
   if (currentPage === "missions") return renderTeacherPlaceholder(user, "指派任務", "為全班或個別學生安排主線、補強與極限挑戰。", "✓");
   if (currentPage === "content") return renderTeacherPlaceholder(user, "教材管理", "建立世界、章節、關卡、題目、提示與獎勵。", "◇");
   if (currentPage === "analytics") return renderTeacherPlaceholder(user, "教學成效", "追蹤答錯率、完成率與教材調整前後的學習變化。", "⌁");
   return renderTeacherOverview(user);
+}
+
+function renderAdminPage(user) {
+  if (currentPage === "accounts") return renderAdminAccounts(user);
+  if (currentPage === "classes") return renderAdminClasses(user);
+  if (currentPage === "analytics") return renderAdminAnalytics(user);
+  return renderAdminOverview(user);
+}
+
+function renderAdminOverview(user) {
+  const dashboard = staffDashboard || {
+    students: [], teachers: [], pendingTeachers: [], classes: [], errorAnalysis: {},
+  };
+  return `
+    ${teacherHeader(user, "平台管理總覽", "所有帳號、教師申請與班級學習狀況")}
+    <section class="metric-grid admin-metrics">
+      <article class="card metric"><span>學生使用者</span><strong>${dashboard.students.length} 人</strong><small>已建立玩家帳號</small></article>
+      <article class="card metric"><span>教師使用者</span><strong>${dashboard.teachers.length} 人</strong><small>${dashboard.teachers.filter((teacher) => teacher.approved).length} 人已核准</small></article>
+      <article class="card metric"><span>待審核申請</span><strong>${dashboard.pendingTeachers.length} 筆</strong><small>${dashboard.pendingTeachers.length ? "請儘速確認教師身分" : "目前皆已處理"}</small></article>
+      <article class="card metric"><span>班級數</span><strong>${dashboard.classes.length} 班</strong><small>依學校與班級自動配對</small></article>
+    </section>
+    ${renderPendingTeachers(dashboard.pendingTeachers)}
+    <div class="section-title"><div><h2>各班學習概況</h2><p>教師、學生與五大能力平均</p></div></div>
+    ${renderClassCards(dashboard.classes)}`;
+}
+
+function renderPendingTeachers(teachers) {
+  return `
+    <article class="card panel pending-panel">
+      <div class="section-title" style="margin:0 0 10px"><div><h2>待審核教師申請</h2><p>核准後，教師才能查看自己班級的學生資料。</p></div><span class="status ${teachers.length ? "warn" : ""}">${teachers.length} 筆</span></div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>申請人</th><th>帳號</th><th>學校</th><th>教學班級</th><th>申請時間</th><th>操作</th></tr></thead>
+        <tbody>${teachers.length ? teachers.map((teacher) => `
+          <tr>
+            <td><b>${escapeHTML(teacher.name)}</b></td>
+            <td>${escapeHTML(teacher.account)}</td>
+            <td>${escapeHTML(teacher.school)}</td>
+            <td>${escapeHTML(teacher.className)}</td>
+            <td>${new Date(teacher.createdAt).toLocaleDateString("zh-TW")}</td>
+            <td><button class="secondary-btn approve-teacher" data-teacher="${teacher.id}">核准教師</button></td>
+          </tr>`).join("") : '<tr><td colspan="6" class="empty-cell">目前沒有待審核申請</td></tr>'}</tbody>
+      </table></div>
+    </article>`;
+}
+
+function renderAdminAccounts(user) {
+  const dashboard = staffDashboard || { users: [], pendingTeachers: [] };
+  return `
+    ${teacherHeader(user, "帳號與申請", "查看所有學生、教師及管理員帳號")}
+    ${renderPendingTeachers(dashboard.pendingTeachers)}
+    <article class="card panel" style="margin-top:20px">
+      <div class="section-title" style="margin:0 0 10px"><div><h2>所有使用者</h2><p>共 ${dashboard.users.length} 個帳號</p></div></div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>身分</th><th>姓名／玩家</th><th>帳號</th><th>學校</th><th>班級</th><th>狀態</th></tr></thead>
+        <tbody>${dashboard.users.map((account) => `
+          <tr>
+            <td><span class="status role-${account.role}">${account.role === "player" ? "學生" : account.role === "teacher" ? "教師" : "管理員"}</span></td>
+            <td><b>${escapeHTML(account.name)}</b></td>
+            <td>${escapeHTML(account.account)}</td>
+            <td>${escapeHTML(account.school)}</td>
+            <td>${escapeHTML(account.className)}</td>
+            <td><span class="status ${account.role === "teacher" && !account.approved ? "warn" : ""}">${account.role === "teacher" && !account.approved ? "待審核" : "可使用"}</span></td>
+          </tr>`).join("")}</tbody>
+      </table></div>
+    </article>`;
+}
+
+function renderAdminClasses(user) {
+  const classes = staffDashboard?.classes || [];
+  return `
+    ${teacherHeader(user, "班級配對", "依學校與班級查看教師、學生及能力分布")}
+    ${renderClassCards(classes)}`;
+}
+
+function renderClassCards(classes) {
+  if (!classes.length) return '<section class="card empty-page"><div><h2>目前沒有班級資料</h2></div></section>';
+  return `<section class="class-grid">${classes.map((classroom) => `
+    <article class="card class-card">
+      <header><div><span class="mission-tag">${escapeHTML(classroom.school)}</span><h3>${escapeHTML(classroom.className)}</h3></div><b>${classroom.students.length} 位學生</b></header>
+      <p><strong>教師：</strong>${classroom.teachers.length ? classroom.teachers.map((teacher) => `${escapeHTML(teacher.name)}${teacher.approved ? "" : "（待審核）"}`).join("、") : "尚未配對"}</p>
+      <div class="class-ability-list">
+        ${abilities.map((ability, index) => `<div><span>${ability.shortName}</span><div class="bar"><span style="width:${classroom.abilities[index]}%;background:${ability.color}"></span></div><b>${classroom.abilities[index]}</b></div>`).join("")}
+      </div>
+      <footer><span>${classroom.attentionCount} 位需要關注</span><span>本週錯題 ${classroom.errorAnalysis.wrongCount || 0} 題</span></footer>
+    </article>`).join("")}</section>`;
+}
+
+function renderAdminAnalytics(user) {
+  const dashboard = staffDashboard || { classes: [], errorAnalysis: {} };
+  return `
+    ${teacherHeader(user, "全平台學習成效", "跨班級查看五大能力與常見錯誤")}
+    ${renderErrorAnalysis(dashboard.errorAnalysis)}
+    <div class="section-title"><div><h2>班級能力比較</h2><p>各班目前五大能力平均</p></div></div>
+    ${renderClassCards(dashboard.classes)}`;
 }
 
 function renderTeacherOverview(user) {
@@ -683,6 +789,11 @@ function renderTeacherOverview(user) {
   const averageCompletion = students.length
     ? Math.round(students.reduce((sum, student) => sum + student.completion, 0) / students.length)
     : 0;
+  const classAbilities = [0, 1, 2, 3, 4].map((index) => students.length
+    ? Math.round(students.reduce((sum, student) => sum + (student.abilities?.[index] || 0), 0) / students.length)
+    : 0);
+  const attentionStudents = students.filter((student) => student.status === "需要關注");
+  const errorAnalysis = staffDashboard?.errorAnalysis || {};
   return `
     ${teacherHeader(user, "班級學習總覽", "本週整體使用與學習狀況")}
     <section class="metric-grid">
@@ -692,12 +803,34 @@ function renderTeacherOverview(user) {
     </section>
     <div class="section-title"><div><h2>班級五大能力</h2><p>本週平均表現與成長趨勢</p></div></div>
     <section class="training-grid">
-      ${abilities.map((a) => `<article class="training-card" style="color:${a.color}"><span class="ability-icon" style="background:${a.color}">${a.icon}</span><h3>${a.name}</h3><small>班級平均</small><div class="mini-progress"><span style="width:${Math.max(a.value - 8, 30)}%"></span></div><footer><span>${Math.max(a.value - 8, 30)} 分</span><span>${a.trend}</span></footer></article>`).join("")}
+      ${abilities.map((a, index) => `<article class="training-card" style="color:${a.color}"><span class="ability-icon" style="background:${a.color}">${a.icon}</span><h3>${a.shortName}</h3><small>班級實際平均</small><div class="mini-progress"><span style="width:${classAbilities[index]}%"></span></div><footer><span>${classAbilities[index]} 分</span><span>${students.length} 人</span></footer></article>`).join("")}
     </section>
     <div class="teacher-layout" style="margin-top:24px">
       ${studentTable()}
-      <article class="card panel"><h2 class="card-title">需要關注</h2><div class="insight focus"><span>!</span><div><b>4 位學生本週使用下降</b><p>建議安排短版回歸任務，協助重新建立學習節奏。</p></div></div><div class="insight"><span>↻</span><div><b>時間與數字題答錯率 38%</b><p>高於其他內容，建議增加聲音雷達補強任務。</p></div></div></article>
-    </div>`;
+      <article class="card panel"><h2 class="card-title">需要關注</h2>
+        ${attentionStudents.length ? attentionStudents.slice(0, 5).map((student) => `<div class="insight focus"><span>!</span><div><b>${escapeHTML(student.name)}｜${student.focus}</b><p>本週學習 ${student.days} 天、平均答題 ${student.averageScore || 0} 分，建議安排短版補強任務。</p></div></div>`).join("") : '<div class="insight good"><span>✓</span><div><b>本週沒有需要特別關注的學生</b><p>全班目前保持穩定學習節奏。</p></div></div>'}
+      </article>
+    </div>
+    ${renderErrorAnalysis(errorAnalysis)}`;
+}
+
+function renderErrorAnalysis(analysis = {}) {
+  const types = analysis.types || [];
+  const vocabulary = analysis.vocabulary || [];
+  return `
+    <section class="error-analysis">
+      <div class="section-title"><div><h2>班級易錯內容</h2><p>依本週每題實際作答紀錄統計</p></div></div>
+      <div class="error-grid">
+        <article class="card panel">
+          <h3>易錯題型</h3>
+          ${types.length ? types.map((item, index) => `<div class="error-rank"><b>${index + 1}</b><span>${escapeHTML(item.label)}</span><em>${item.count} 次答錯</em></div>`).join("") : '<p class="empty-hint">尚未累積逐題錯題紀錄，學生完成新版任務後會自動呈現。</p>'}
+        </article>
+        <article class="card panel">
+          <h3>易錯單字／答案</h3>
+          ${vocabulary.length ? vocabulary.map((item, index) => `<div class="error-rank"><b>${index + 1}</b><span>${escapeHTML(item.label)}</span><em>${item.count} 次答錯</em></div>`).join("") : '<p class="empty-hint">目前沒有可統計的易錯單字。</p>'}
+        </article>
+      </div>
+    </section>`;
 }
 
 function studentTable() {
@@ -720,7 +853,7 @@ function renderStudents(user) {
       ${teacherHeader(user, "學生學習狀況", "挑選個別使用者，查看完整學習分析")}
       <section class="card empty-page"><div><div class="big-icon">♙</div><h2>目前班級尚無玩家</h2><p style="color:var(--muted)">玩家使用相同學校與班級完成註冊後，就會出現在這裡。</p></div></section>`;
   }
-  const studentAbilities = s.abilities || abilities.map((ability, index) => Math.max(36, ability.value - index * 2));
+  const studentAbilities = s.abilities || [0, 0, 0, 0, 0];
   return `
     ${teacherHeader(user, "學生學習狀況", "挑選個別使用者，查看完整學習分析")}
     <section class="teacher-layout">
@@ -728,7 +861,7 @@ function renderStudents(user) {
       <article class="card panel student-detail">
         <header><span class="avatar">${s.name[0]}</span><div><h3>${s.name}</h3><p>${s.player}｜${s.level}</p></div></header>
         <div class="detail-stat"><label><span>本週任務完成率</span><b>${s.completion}%</b></label><div class="bar"><span style="width:${s.completion}%"></span></div></div>
-        ${abilities.map((a, i) => `<div class="detail-stat"><label><span>${a.name}</span><b>${studentAbilities[i]} ${a.trend}</b></label><div class="bar"><span style="width:${studentAbilities[i]}%;background:${a.color}"></span></div></div>`).join("")}
+        ${abilities.map((a, i) => `<div class="detail-stat"><label><span>${a.shortName}</span><b>${studentAbilities[i]}</b></label><div class="bar"><span style="width:${studentAbilities[i]}%;background:${a.color}"></span></div></div>`).join("")}
         <div class="insight ${s.status.includes("關注") ? "focus" : "good"}"><span>✦</span><div><b>系統建議</b><p>${s.status.includes("關注") ? `優先安排「${s.focus}」，以 5 分鐘短任務協助恢復節奏。` : `學習節奏穩定，可安排「${s.focus}」延伸任務。`}</p></div></div>
         <button class="primary-btn mission-action">為 ${s.name.slice(1)} 指派任務</button>
       </article>
@@ -753,6 +886,25 @@ function normalizeQuestion(question) {
     answer: question[3],
     speech: question[4] || "",
   };
+}
+
+function questionTypeFor(ability, prompt) {
+  if (ability === "word") return "單字辨識";
+  if (ability === "echo") return "聽力理解";
+  if (ability === "spell") return "拼字";
+  if (ability === "voice") return "情境口說";
+  if (prompt.includes("重新組合") || prompt.includes("用法")) return "句型與語序";
+  return "閱讀理解";
+}
+
+function vocabularyFor(question) {
+  const answer = question.options[question.answer] || "";
+  return answer
+    .replace(/[.!?,'"]/g, "")
+    .trim()
+    .split(/\s+/)
+    .slice(0, 4)
+    .join(" ");
 }
 
 function startGame(mode, id) {
@@ -780,6 +932,7 @@ function startGame(mode, id) {
     answered: false,
     selected: null,
     synced: false,
+    attempts: [],
   };
   document.body.insertAdjacentHTML("beforeend", renderGameModal());
   bindGameModalEvents();
@@ -864,7 +1017,12 @@ async function claimGameResult() {
 
   try {
     if (user.cloud) {
-      const updated = await Cloud.recordLearning(gameState.ability, xp, score);
+      const updated = await Cloud.recordLearning(
+        gameState.ability,
+        xp,
+        score,
+        gameState.attempts,
+      );
       user.xp = updated.xp;
       user.abilityValues = updated.abilityValues;
       user.abilityTrends = updated.abilityTrends;
@@ -907,9 +1065,20 @@ function bindGameModalEvents() {
   document.querySelectorAll(".answer-option").forEach((button) => button.addEventListener("click", () => {
     if (gameState.answered) return;
     const selected = Number(button.dataset.answer);
+    const question = gameState.questions[gameState.index];
     gameState.selected = selected;
     gameState.answered = true;
-    if (selected === gameState.questions[gameState.index].answer) gameState.correct += 1;
+    if (selected === question.answer) gameState.correct += 1;
+    gameState.attempts.push({
+      ability: gameState.ability,
+      question_key: `${gameState.mode}:${gameState.id}:${gameState.index}`,
+      prompt: question.prompt,
+      question_type: questionTypeFor(gameState.ability, question.prompt),
+      vocabulary: vocabularyFor(question),
+      selected_answer: question.options[selected],
+      correct_answer: question.options[question.answer],
+      is_correct: selected === question.answer,
+    });
     refreshGameModal();
   }));
   document.getElementById("next-question")?.addEventListener("click", () => {
@@ -1100,6 +1269,24 @@ function bindEvents() {
   document.querySelectorAll(".mission-action").forEach((button) => button.addEventListener("click", () => {
     toast("原型已記錄操作：任務編輯器將在下一版串接。");
   }));
+
+  document.querySelectorAll(".approve-teacher").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const originalText = button.textContent;
+      button.disabled = true;
+      button.textContent = "核准中...";
+      try {
+        await Cloud.setTeacherApproval(button.dataset.teacher, true);
+        await refreshTeacherStudents(currentUser());
+        render();
+        toast("教師帳號已核准，可使用教師入口登入。");
+      } catch (error) {
+        button.disabled = false;
+        button.textContent = originalText;
+        toast(`核准失敗：${error.message}`);
+      }
+    });
+  });
 }
 
 render();

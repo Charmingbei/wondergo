@@ -235,7 +235,145 @@ const Cloud = (() => {
     });
   }
 
-  async function recordLearning(ability, xpEarned, score = 100) {
+  async function loadStaffDashboard() {
+    const monday = new Date();
+    const day = monday.getDay();
+    monday.setDate(monday.getDate() - (day === 0 ? 6 : day - 1));
+    monday.setHours(0, 0, 0, 0);
+    const since = encodeURIComponent(monday.toISOString());
+    const [profiles, progress, events, attempts] = await Promise.all([
+      request("/rest/v1/profiles?select=id,role,account,school,class_name,seat,real_name,display_name,xp,adventure_level,cefr_level,is_approved,created_at&order=created_at.desc"),
+      request("/rest/v1/ability_progress?select=*"),
+      request(`/rest/v1/learning_events?created_at=gte.${since}&select=user_id,ability,score,xp_earned,duration_seconds,created_at&order=created_at.desc`),
+      request(`/rest/v1/question_attempts?created_at=gte.${since}&select=user_id,ability,question_type,vocabulary,prompt,is_correct,created_at&order=created_at.desc`),
+    ]);
+    const progressByUser = new Map(progress.map((item) => [item.user_id, item]));
+    const eventsByUser = groupBy(events, "user_id");
+    const attemptsByUser = groupBy(attempts, "user_id");
+    const users = profiles.map((profile) => {
+      const userEvents = eventsByUser.get(profile.id) || [];
+      const userAttempts = attemptsByUser.get(profile.id) || [];
+      const ability = progressByUser.get(profile.id) || {};
+      const abilityValues = [
+        ability.word_power || 0,
+        ability.echo_sense || 0,
+        ability.story_vision || 0,
+        ability.spell_craft || 0,
+        ability.voice_power || 0,
+      ];
+      const studyDays = new Set(
+        userEvents.map((event) => new Date(event.created_at).toISOString().slice(0, 10)),
+      ).size;
+      const averageScore = userEvents.length
+        ? Math.round(userEvents.reduce((sum, event) => sum + Number(event.score || 0), 0) / userEvents.length)
+        : 0;
+      const weakestIndex = abilityValues.indexOf(Math.min(...abilityValues));
+      return {
+        id: profile.id,
+        role: profile.role,
+        account: profile.account,
+        name: profile.real_name,
+        player: profile.account,
+        school: profile.school,
+        className: profile.class_name,
+        seat: profile.seat || "",
+        level: profile.cefr_level,
+        xp: profile.xp,
+        approved: profile.is_approved,
+        createdAt: profile.created_at,
+        days: studyDays,
+        taskCount: userEvents.length,
+        completion: Math.min(100, userEvents.length * 10),
+        averageScore,
+        focus: ["語彙能量", "聲音雷達", "解碼視野", "拼字工藝", "語音引擎"][weakestIndex],
+        status: profile.role === "player" && (studyDays < 2 || (userEvents.length && averageScore < 60))
+          ? "需要關注"
+          : "穩定進步",
+        abilities: abilityValues,
+        attempts: userAttempts,
+      };
+    });
+    const students = users.filter((user) => user.role === "player");
+    const teachers = users.filter((user) => user.role === "teacher");
+    const classes = buildClassSummaries(students, teachers);
+    return {
+      users,
+      students,
+      teachers,
+      pendingTeachers: teachers.filter((teacher) => !teacher.approved),
+      classes,
+      errorAnalysis: summarizeErrors(students.flatMap((student) => student.attempts)),
+    };
+  }
+
+  function groupBy(items, key) {
+    const groups = new Map();
+    items.forEach((item) => {
+      const value = item[key];
+      if (!groups.has(value)) groups.set(value, []);
+      groups.get(value).push(item);
+    });
+    return groups;
+  }
+
+  function buildClassSummaries(students, teachers) {
+    const classMap = new Map();
+    [...students, ...teachers].forEach((user) => {
+      const key = `${user.school}::${user.className}`;
+      if (!classMap.has(key)) {
+        classMap.set(key, {
+          key,
+          school: user.school,
+          className: user.className,
+          students: [],
+          teachers: [],
+        });
+      }
+      classMap.get(key)[user.role === "player" ? "students" : "teachers"].push(user);
+    });
+    return [...classMap.values()].map((classroom) => {
+      const count = classroom.students.length || 1;
+      return {
+        ...classroom,
+        abilities: [0, 1, 2, 3, 4].map((index) =>
+          Math.round(classroom.students.reduce((sum, student) => sum + student.abilities[index], 0) / count),
+        ),
+        attentionCount: classroom.students.filter((student) => student.status === "需要關注").length,
+        errorAnalysis: summarizeErrors(classroom.students.flatMap((student) => student.attempts)),
+      };
+    });
+  }
+
+  function summarizeErrors(attempts) {
+    const wrong = attempts.filter((attempt) => !attempt.is_correct);
+    const countValues = (field) => {
+      const counts = new Map();
+      wrong.forEach((attempt) => {
+        const value = attempt[field];
+        if (value) counts.set(value, (counts.get(value) || 0) + 1);
+      });
+      return [...counts.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([label, count]) => ({ label, count }));
+    };
+    return {
+      totalAttempts: attempts.length,
+      wrongCount: wrong.length,
+      types: countValues("question_type"),
+      vocabulary: countValues("vocabulary"),
+    };
+  }
+
+  async function setTeacherApproval(teacherId, approved) {
+    const rows = await request("/rest/v1/rpc/set_teacher_approval", {
+      method: "POST",
+      body: JSON.stringify({ p_teacher_id: teacherId, p_approved: approved }),
+    });
+    return Array.isArray(rows) ? rows[0] : rows;
+  }
+
+  async function recordLearning(ability, xpEarned, score = 100, attempts = []) {
     const rows = await request("/rest/v1/rpc/record_learning_event", {
       method: "POST",
       body: JSON.stringify({
@@ -247,6 +385,16 @@ const Cloud = (() => {
       }),
     });
     const profile = Array.isArray(rows) ? rows[0] : rows;
+    if (attempts.length) {
+      try {
+        await request("/rest/v1/rpc/record_question_attempts", {
+          method: "POST",
+          body: JSON.stringify({ p_attempts: attempts }),
+        });
+      } catch (error) {
+        console.warn("Question analytics sync failed", error);
+      }
+    }
     return { ...profile, ...(await loadPlayerLearningData()) };
   }
 
@@ -286,7 +434,9 @@ const Cloud = (() => {
     login,
     restoreSession,
     loadClassStudents,
+    loadStaffDashboard,
     loadPlayerLearningData,
+    setTeacherApproval,
     recordLearning,
     logout,
   };
