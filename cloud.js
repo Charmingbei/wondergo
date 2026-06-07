@@ -106,9 +106,65 @@ const Cloud = (() => {
     const session = getSession();
     const userId = session?.user?.id;
     if (!userId) return null;
-    const rows = await request(`/rest/v1/profiles?id=eq.${userId}&select=*`, { accessToken });
+    const [rows, learning] = await Promise.all([
+      request(`/rest/v1/profiles?id=eq.${userId}&select=*`, { accessToken }),
+      loadPlayerLearningData(accessToken),
+    ]);
     if (!rows[0]) return null;
-    return mapProfile(rows[0]);
+    return { ...mapProfile(rows[0]), ...learning };
+  }
+
+  async function loadPlayerLearningData(accessToken) {
+    const session = getSession();
+    const userId = session?.user?.id;
+    if (!userId) return emptyPlayerLearningData();
+
+    const monday = new Date();
+    const day = monday.getDay();
+    monday.setDate(monday.getDate() - (day === 0 ? 6 : day - 1));
+    monday.setHours(0, 0, 0, 0);
+    const [progressRows, events] = await Promise.all([
+      request(`/rest/v1/ability_progress?user_id=eq.${userId}&select=*`, { accessToken }),
+      request(
+        `/rest/v1/learning_events?user_id=eq.${userId}` +
+          `&created_at=gte.${encodeURIComponent(monday.toISOString())}` +
+          "&select=ability,score,xp_earned,duration_seconds,created_at&order=created_at.desc",
+        { accessToken },
+      ),
+    ]);
+    const progress = progressRows[0] || {};
+    const abilityValues = {
+      word: progress.word_power || 0,
+      echo: progress.echo_sense || 0,
+      story: progress.story_vision || 0,
+      spell: progress.spell_craft || 0,
+      voice: progress.voice_power || 0,
+    };
+    const abilityTrends = { word: 0, echo: 0, story: 0, spell: 0, voice: 0 };
+    events.forEach((event) => {
+      if (event.ability in abilityTrends) abilityTrends[event.ability] += 1;
+    });
+    const studyDays = new Set(
+      events.map((event) => new Date(event.created_at).toISOString().slice(0, 10)),
+    ).size;
+
+    return {
+      abilityValues,
+      abilityTrends,
+      weeklySummary: {
+        studyDays,
+        completedTasks: events.length,
+        xpEarned: events.reduce((total, event) => total + (event.xp_earned || 0), 0),
+      },
+    };
+  }
+
+  function emptyPlayerLearningData() {
+    return {
+      abilityValues: { word: 0, echo: 0, story: 0, spell: 0, voice: 0 },
+      abilityTrends: { word: 0, echo: 0, story: 0, spell: 0, voice: 0 },
+      weeklySummary: { studyDays: 0, completedTasks: 0, xpEarned: 0 },
+    };
   }
 
   async function restoreSession() {
@@ -190,7 +246,8 @@ const Cloud = (() => {
         p_duration_seconds: 0,
       }),
     });
-    return Array.isArray(rows) ? rows[0] : rows;
+    const profile = Array.isArray(rows) ? rows[0] : rows;
+    return { ...profile, ...(await loadPlayerLearningData()) };
   }
 
   async function logout() {
@@ -229,6 +286,7 @@ const Cloud = (() => {
     login,
     restoreSession,
     loadClassStudents,
+    loadPlayerLearningData,
     recordLearning,
     logout,
   };

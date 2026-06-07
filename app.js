@@ -248,6 +248,31 @@ function currentUser() {
   return data.users.find((user) => user.account === data.currentUser?.account && user.role === data.currentUser?.role);
 }
 
+function emptyAbilityValues() {
+  return { word: 0, echo: 0, story: 0, spell: 0, voice: 0 };
+}
+
+function playerAbilities(user = currentUser()) {
+  const values = user?.abilityValues || emptyAbilityValues();
+  const trends = user?.abilityTrends || emptyAbilityValues();
+  return abilities.map((ability) => ({
+    ...ability,
+    name: ability.shortName,
+    value: Math.max(0, Math.min(100, Number(values[ability.id]) || 0)),
+    trendValue: Number(trends[ability.id]) || 0,
+  }));
+}
+
+async function refreshPlayerLearning(user) {
+  if (!user?.cloud || user.role !== "player") return;
+  try {
+    Object.assign(user, await Cloud.loadPlayerLearningData());
+    saveData();
+  } catch (error) {
+    toast(`能力資料同步失敗：${error.message}`);
+  }
+}
+
 function activeStudents() {
   return currentUser()?.cloud ? cloudStudents : demoStudents;
 }
@@ -563,38 +588,48 @@ function radarSVG(values = abilities) {
     </svg>`;
 }
 
-function renderRadarCard(title, subtitle, values = abilities) {
+function renderRadarCard(title, subtitle, values = playerAbilities()) {
+  const weeklyGrowth = values.reduce((sum, ability) => sum + ability.trendValue, 0);
   return `
     <article class="card radar-card">
       <h3>${title}</h3>
       <p>${subtitle}</p>
       ${radarSVG(values)}
-      <span class="radar-caption">↑ 本週整體語力提升 8%</span>
+      <span class="radar-caption">${weeklyGrowth ? `↑ 本週完成 ${weeklyGrowth} 次能力訓練` : "本週尚未完成能力訓練"}</span>
     </article>`;
 }
 
 function renderAbility(user) {
+  const actualAbilities = playerAbilities(user);
+  const weeklyGrowth = actualAbilities.reduce((sum, ability) => sum + ability.trendValue, 0);
+  const strongest = [...actualAbilities].sort((a, b) => b.value - a.value)[0];
+  const weakest = [...actualAbilities].sort((a, b) => a.value - b.value)[0];
+  const hasLearningData = actualAbilities.some((ability) => ability.value > 0);
   return `
     ${playerHeader(user, "我的能力", "看見自己的強項，也知道下一步可以怎麼進步。")}
     <section class="ability-page">
       <article class="card profile-card">
         <div class="profile-orb"><img src="assets/toki.png" alt="Toki 夥伴" /></div>
         <h2>${escapeHTML(user.account)}</h2>
-        <p style="color:var(--muted)">Lv.${user.level}｜城市探索者｜CEFR A1-2</p>
-        <div class="radar-wrap">${radarSVG()}</div>
-        <b>本週整體語力提升 8%</b>
+        <p style="color:var(--muted)">Lv.${user.level || 1}｜城市探索者｜CEFR ${escapeHTML(user.cefrLevel || "Pre-A1")}</p>
+        <div class="radar-wrap">${radarSVG(actualAbilities)}</div>
+        <b>${weeklyGrowth ? `本週完成 ${weeklyGrowth} 次能力訓練` : "本週尚未開始能力訓練"}</b>
       </article>
       <div>
         <article class="card report-card">
           <h2>五大冒險能力</h2>
           <div class="ability-list">
-            ${abilities.map((a) => `<div class="ability-row"><span class="ability-icon" style="background:${a.color}">${a.icon}</span><div><h4>${a.name}</h4><p>${a.en}｜本週 ${a.trend}</p></div><strong>${a.value}</strong></div>`).join("")}
+            ${actualAbilities.map((a) => `<div class="ability-row"><span class="ability-icon" style="background:${a.color}">${a.icon}</span><div><h4>${a.name}</h4><p>${a.en}｜本週完成 ${a.trendValue} 次</p></div><strong>${a.value}</strong></div>`).join("")}
           </div>
         </article>
         <article class="card report-card" style="margin-top:20px">
           <h2>Toki 的學習分析</h2>
-          <div class="insight good"><span>✨</span><div><b>你的語彙能量是目前最強能力！</b><p>你已掌握 186 個單字，而且一週後仍能記得 82%。本週又收集了 18 顆語彙晶石。</p></div></div>
-          <div class="insight focus"><span>⚡</span><div><b>語音引擎需要補充能量</b><p>你認得多數句子，但本週只開口練習兩次。每天完成一次「勇敢開口」，預計兩週可提升流暢度。</p></div></div>
+          ${hasLearningData ? `
+            <div class="insight good"><span>✨</span><div><b>${strongest.name}是目前最強能力！</b><p>目前能力值為 ${strongest.value}，本週完成 ${strongest.trendValue} 次相關訓練。繼續挑戰可以讓優勢更穩定。</p></div></div>
+            <div class="insight focus"><span>⚡</span><div><b>${weakest.name}是下一個補強方向</b><p>目前能力值為 ${weakest.value}。建議今天先完成一次「${weakest.name}」場館任務，逐步補足能力。</p></div></div>
+          ` : `
+            <div class="insight focus"><span>✦</span><div><b>完成第一座訓練館，啟動能力分析</b><p>目前五項能力尚無學習紀錄。完成任一場館的 10 題練習後，雷達圖與建議會依你的實際表現更新。</p></div></div>
+          `}
         </article>
       </div>
     </section>`;
@@ -827,8 +862,19 @@ async function claimGameResult() {
     if (user.cloud) {
       const updated = await Cloud.recordLearning(gameState.ability, xp, score);
       user.xp = updated.xp;
+      user.abilityValues = updated.abilityValues;
+      user.abilityTrends = updated.abilityTrends;
+      user.weeklySummary = updated.weeklySummary;
     } else {
       user.xp = (user.xp || 0) + xp;
+      user.abilityValues ||= emptyAbilityValues();
+      user.abilityTrends ||= emptyAbilityValues();
+      user.abilityValues[gameState.ability] = Math.min(
+        100,
+        (user.abilityValues[gameState.ability] || 0) + 1,
+      );
+      user.abilityTrends[gameState.ability] =
+        (user.abilityTrends[gameState.ability] || 0) + 1;
     }
     saveData();
     currentPage = "home";
@@ -1051,6 +1097,10 @@ function bindEvents() {
 
 render();
 
-if (currentUser()?.cloud && currentUser()?.role === "teacher") {
-  refreshTeacherStudents(currentUser()).then(render);
+if (currentUser()?.cloud) {
+  const user = currentUser();
+  const refresh = user.role === "teacher"
+    ? refreshTeacherStudents(user)
+    : refreshPlayerLearning(user);
+  refresh.then(render);
 }
