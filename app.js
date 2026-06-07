@@ -978,6 +978,18 @@ function getDailyKey() {
   return formatter.format(new Date());
 }
 
+function dailyTaskStorageKey(user, taskKey) {
+  return `wondergo-task:${getDailyKey()}:${user.account}:${taskKey}`;
+}
+
+function getLocalDailyTaskCount(user, taskKey) {
+  return Number(localStorage.getItem(dailyTaskStorageKey(user, taskKey))) || 0;
+}
+
+function calculateAwardedXp(baseXp, completionCount) {
+  return completionCount >= 1 ? Math.floor(baseXp / 2) : baseXp;
+}
+
 function hashSeed(value) {
   let hash = 2166136261;
   for (const character of value) {
@@ -1076,6 +1088,7 @@ function startGame(mode, id) {
       ? { main: "晨光鎮通行考驗", support: "回音訊號救援", challenge: "語序機關迷宮" }[id]
       : abilityInfo.name,
     color: abilityInfo.color,
+    taskKey: `${mode}:${id}`,
     questions: source,
     index: 0,
     correct: 0,
@@ -1094,14 +1107,18 @@ function renderGameModal() {
 
 function renderGameCard() {
   if (gameState.index >= gameState.questions.length) {
-    const xp = 20 + gameState.correct * 5;
+    const baseXp = 20 + gameState.correct * 5;
+    const user = currentUser();
+    const completionCount = getLocalDailyTaskCount(user, gameState.taskKey);
+    const expectedXp = calculateAwardedXp(baseXp, completionCount);
     return `
       <article class="game-card result-card">
         <div class="result-burst">🏆</div>
         <span class="mission-tag">訓練完成</span>
         <h2>${gameState.title}過關！</h2>
         <p>你完成了 10 題練習，答對 <strong>${gameState.correct}</strong> 題。</p>
-        <div class="result-xp">＋${xp} XP</div>
+        <div class="result-xp">＋${expectedXp} XP</div>
+        ${completionCount >= 1 ? '<p class="repeat-xp-note">今日重複挑戰：本次經驗值折半</p>' : ""}
         <button class="primary-btn wide" id="claim-result">領取經驗值</button>
       </article>`;
   }
@@ -1172,23 +1189,28 @@ async function claimGameResult() {
     claimButton.textContent = "經驗值領取中...";
   }
   const user = currentUser();
-  const xp = 20 + gameState.correct * 5;
+  const baseXp = 20 + gameState.correct * 5;
   const score = gameState.correct * 10;
 
   try {
+    let awardedXp = baseXp;
     if (user.cloud) {
       const updated = await Cloud.recordLearning(
+        gameState.taskKey,
         gameState.ability,
-        xp,
+        baseXp,
         score,
         gameState.attempts,
       );
       user.xp = updated.xp;
+      awardedXp = updated.awardedXp;
       user.abilityValues = updated.abilityValues;
       user.abilityTrends = updated.abilityTrends;
       user.weeklySummary = updated.weeklySummary;
     } else {
-      user.xp = (user.xp || 0) + xp;
+      const completionCount = getLocalDailyTaskCount(user, gameState.taskKey);
+      awardedXp = calculateAwardedXp(baseXp, completionCount);
+      user.xp = (user.xp || 0) + awardedXp;
       user.abilityValues ||= emptyAbilityValues();
       user.abilityTrends ||= emptyAbilityValues();
       user.abilityValues[gameState.ability] = Math.min(
@@ -1198,12 +1220,16 @@ async function claimGameResult() {
       user.abilityTrends[gameState.ability] =
         (user.abilityTrends[gameState.ability] || 0) + 1;
     }
+    localStorage.setItem(
+      dailyTaskStorageKey(user, gameState.taskKey),
+      String(getLocalDailyTaskCount(user, gameState.taskKey) + 1),
+    );
     saveData();
     currentPage = "home";
     document.getElementById("game-modal")?.remove();
     render();
     window.scrollTo({ top: 0, behavior: "smooth" });
-    toast(`訓練完成！獲得 ${xp} XP`);
+    toast(`訓練完成！獲得 ${awardedXp} XP${awardedXp < baseXp ? "（今日重複挑戰折半）" : ""}`);
   } catch {
     gameState.synced = false;
     if (claimButton) {

@@ -421,18 +421,17 @@ const Cloud = (() => {
     });
   }
 
-  async function recordLearning(ability, xpEarned, score = 100, attempts = []) {
-    const rows = await request("/rest/v1/rpc/record_learning_event", {
+  async function recordLearning(taskKey, ability, baseXp, score = 100, attempts = []) {
+    const result = await request("/rest/v1/rpc/record_task_completion", {
       method: "POST",
       body: JSON.stringify({
+        p_task_key: taskKey,
         p_ability: ability,
-        p_event_type: "practice_answer",
         p_score: score,
-        p_xp_earned: xpEarned,
+        p_base_xp: baseXp,
         p_duration_seconds: 0,
       }),
     });
-    const profile = Array.isArray(rows) ? rows[0] : rows;
     if (attempts.length) {
       try {
         await request("/rest/v1/rpc/record_question_attempts", {
@@ -443,7 +442,14 @@ const Cloud = (() => {
         console.warn("Question analytics sync failed", error);
       }
     }
-    return { ...profile, ...(await loadPlayerLearningData()) };
+    return {
+      ...result.profile,
+      awardedXp: result.awarded_xp,
+      baseXp: result.base_xp,
+      repeatCount: result.repeat_count,
+      isRepeat: result.is_repeat,
+      ...(await loadPlayerLearningData()),
+    };
   }
 
   async function logout() {
