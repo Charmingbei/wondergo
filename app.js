@@ -1,12 +1,184 @@
 const STORAGE_KEY = "wondergo-prototype-v1";
 
 const abilities = [
-  { id: "word", name: "語彙能量", en: "Word Power", icon: "◆", color: "#6c4ee3", value: 82, trend: "+6%" },
-  { id: "echo", name: "聲音雷達", en: "Echo Sense", icon: "◖", color: "#22b8ae", value: 64, trend: "+12%" },
-  { id: "story", name: "解碼視野", en: "Story Vision", icon: "◉", color: "#4e8cf7", value: 76, trend: "+5%" },
-  { id: "spell", name: "拼字工藝", en: "Spell Craft", icon: "✦", color: "#ef9f2f", value: 71, trend: "+3%" },
-  { id: "voice", name: "語音引擎", en: "Voice Power", icon: "◍", color: "#f06d73", value: 48, trend: "+8%" },
+  { id: "word", name: "語彙晶石礦場", shortName: "語彙能量", en: "Word Power", icon: "◆", scene: "💎", color: "#6c4ee3", value: 82, trend: "+6%", description: "收集單字晶石，啟動冒險裝備" },
+  { id: "echo", name: "回音雷達塔", shortName: "聲音雷達", en: "Echo Sense", icon: "◖", scene: "📡", color: "#22b8ae", value: 64, trend: "+12%", description: "接收英語訊號，辨識聲音線索" },
+  { id: "story", name: "故事解碼森林", shortName: "解碼視野", en: "Story Vision", icon: "◉", scene: "📜", color: "#4e8cf7", value: 76, trend: "+5%", description: "閱讀地圖與故事，破解任務密碼" },
+  { id: "spell", name: "魔法拼字工坊", shortName: "拼字工藝", en: "Spell Craft", icon: "✦", scene: "⚙️", color: "#ef9f2f", value: 71, trend: "+3%", description: "組合字母零件，修復語言機關" },
+  { id: "voice", name: "勇者語音競技場", shortName: "語音引擎", en: "Voice Power", icon: "◍", scene: "🎙️", color: "#f06d73", value: 48, trend: "+8%", description: "開口回應角色，啟動語音引擎" },
 ];
+
+const questionBanks = {
+  word: {
+    preA1: [
+      ["🍎", "哪一個單字是「蘋果」？", ["apple", "orange", "banana", "grape"], 0],
+      ["🐱", "哪一個單字是「貓」？", ["dog", "bird", "cat", "fish"], 2],
+      ["🔵", "哪一個單字是「藍色」？", ["red", "blue", "green", "black"], 1],
+      ["👩", "哪一個單字是「媽媽」？", ["mother", "father", "brother", "sister"], 0],
+      ["📘", "哪一個單字是「書」？", ["pen", "desk", "book", "bag"], 2],
+      ["7️⃣", "數字 7 的英文是？", ["six", "seven", "eight", "nine"], 1],
+      ["🍚", "哪一個單字是「米飯」？", ["rice", "milk", "juice", "cake"], 0],
+      ["☀️", "哪一個單字是「晴天」？", ["rainy", "windy", "sunny", "cloudy"], 2],
+      ["✋", "哪一個單字是「手」？", ["head", "hand", "foot", "eye"], 1],
+      ["🏫", "哪一個單字是「學校」？", ["park", "home", "store", "school"], 3],
+    ],
+    a1: [
+      ["🕗", "哪一個單字表示「早餐」？", ["breakfast", "lunch", "dinner", "snack"], 0],
+      ["🚲", "哪一個單字是「腳踏車」？", ["train", "bike", "bus", "car"], 1],
+      ["📅", "星期三的英文是？", ["Monday", "Tuesday", "Wednesday", "Thursday"], 2],
+      ["👨‍⚕️", "哪一個單字是「醫生」？", ["teacher", "doctor", "farmer", "cook"], 1],
+      ["🛏️", "哪一個單字是「臥室」？", ["kitchen", "bathroom", "bedroom", "living room"], 2],
+      ["🐘", "哪一個單字表示「高大的」？", ["short", "tall", "thin", "small"], 1],
+      ["🥤", "哪一個單字是「口渴的」？", ["hungry", "tired", "thirsty", "angry"], 2],
+      ["🎹", "哪一個單字是「鋼琴」？", ["violin", "guitar", "drum", "piano"], 3],
+      ["🌸", "春天的英文是？", ["spring", "summer", "fall", "winter"], 0],
+      ["✈️", "哪一個單字是「機場」？", ["station", "airport", "hospital", "library"], 1],
+    ],
+  },
+  echo: {
+    preA1: [
+      ["🔊", "聽一聽，選出你聽到的單字。", ["book", "bag", "ball", "box"], 0, "book"],
+      ["🔊", "聽一聽，選出你聽到的顏色。", ["green", "red", "blue", "white"], 2, "blue"],
+      ["🔊", "聽一聽，選出你聽到的數字。", ["three", "five", "eight", "ten"], 1, "five"],
+      ["🔊", "聽一聽，這是哪一位家人？", ["father", "mother", "sister", "brother"], 3, "brother"],
+      ["🔊", "聽一聽，這是什麼動物？", ["cat", "dog", "fish", "bird"], 1, "dog"],
+      ["🔊", "聽一聽，選出正確的食物。", ["cake", "rice", "egg", "milk"], 2, "egg"],
+      ["🔊", "聽一聽，選出正確的教室物品。", ["chair", "desk", "pen", "ruler"], 3, "ruler"],
+      ["🔊", "聽一聽，選出正確的天氣。", ["sunny", "rainy", "windy", "cloudy"], 1, "rainy"],
+      ["🔊", "聽一聽，選出正確的身體部位。", ["eyes", "ears", "nose", "mouth"], 2, "nose"],
+      ["🔊", "聽一聽，選出正確的招呼語。", ["Good morning.", "Good night.", "Goodbye.", "Thank you."], 0, "Good morning."],
+    ],
+    a1: [
+      ["🔊", "聽一聽，他幾點起床？", ["six o'clock", "seven o'clock", "eight o'clock", "nine o'clock"], 1, "I get up at seven o'clock."],
+      ["🔊", "聽一聽，她喜歡什麼？", ["baseball", "basketball", "soccer", "tennis"], 2, "She likes soccer."],
+      ["🔊", "聽一聽，今天是星期幾？", ["Monday", "Tuesday", "Friday", "Sunday"], 2, "Today is Friday."],
+      ["🔊", "聽一聽，他想吃什麼？", ["noodles", "rice", "pizza", "salad"], 0, "I want some noodles."],
+      ["🔊", "聽一聽，東西在哪裡？", ["on the desk", "under the desk", "in the bag", "by the door"], 1, "It is under the desk."],
+      ["🔊", "聽一聽，誰會游泳？", ["Amy", "Ben", "Cindy", "David"], 0, "Amy can swim."],
+      ["🔊", "聽一聽，天氣如何？", ["hot", "cold", "warm", "cool"], 3, "It is cool today."],
+      ["🔊", "聽一聽，他怎麼去學校？", ["by bus", "by bike", "on foot", "by car"], 0, "He goes to school by bus."],
+      ["🔊", "聽一聽，這件衣服多少錢？", ["fifty dollars", "sixty dollars", "seventy dollars", "eighty dollars"], 2, "It is seventy dollars."],
+      ["🔊", "聽一聽，她正在做什麼？", ["reading", "singing", "cooking", "drawing"], 3, "She is drawing a picture."],
+    ],
+  },
+  story: {
+    preA1: [
+      ["👋", "A: Hello!  B: ______", ["Hello!", "Thank you.", "Good night.", "Sorry."], 0],
+      ["🙂", "A: How are you?  B: ______", ["I'm fine.", "I'm seven.", "It's blue.", "Goodbye."], 0],
+      ["🎂", "A: How old are you?  B: ______", ["I'm Amy.", "I'm nine.", "I'm happy.", "I'm here."], 1],
+      ["🧒", "My name ______ Tom.", ["am", "are", "is", "be"], 2],
+      ["🐶", "This is my dog. ______ name is Lucky.", ["My", "Your", "Its", "His"], 2],
+      ["🎨", "The sun is ______.", ["yellow", "purple", "black", "pink"], 0],
+      ["🏫", "I am a student. I go to ______.", ["school", "hospital", "farm", "zoo"], 0],
+      ["🍕", "I like pizza. Pizza is my favorite ______.", ["color", "animal", "food", "number"], 2],
+      ["👨‍👩‍👧", "This is my mother. She is my ______.", ["family", "teacher", "friend", "classmate"], 0],
+      ["🌙", "It is time to sleep. We say ______.", ["Good morning.", "Good afternoon.", "Good night.", "Hello."], 2],
+    ],
+    a1: [
+      ["🏀", "Kevin plays basketball after school. What does Kevin do after school?", ["He reads.", "He plays basketball.", "He swims.", "He cooks."], 1],
+      ["🕖", "Mia gets up at seven. What time does Mia get up?", ["At six.", "At seven.", "At eight.", "At nine."], 1],
+      ["🍜", "Leo is hungry. He wants noodles. What does Leo want?", ["Rice.", "Bread.", "Noodles.", "Soup."], 2],
+      ["☔", "It is rainy today. Anna takes an umbrella. Why does she take it?", ["It is hot.", "It is rainy.", "It is windy.", "It is snowy."], 1],
+      ["📚", "The library is next to the park. Where is the library?", ["Behind the school.", "Next to the park.", "In the zoo.", "Under the bridge."], 1],
+      ["🐼", "Pandas are black and white. What color are pandas?", ["Brown.", "Black and white.", "Yellow.", "Gray."], 1],
+      ["🎵", "Sam can sing, but he cannot dance. What can Sam do?", ["Dance.", "Swim.", "Sing.", "Cook."], 2],
+      ["🚌", "We go to the museum by bus. How do we go there?", ["By train.", "By bus.", "By bike.", "On foot."], 1],
+      ["🥛", "There are two bottles of milk on the table. How many bottles are there?", ["One.", "Two.", "Three.", "Four."], 1],
+      ["👕", "This T-shirt is too small. I need a bigger one. What does the speaker need?", ["A smaller T-shirt.", "A bigger T-shirt.", "A hat.", "A jacket."], 1],
+    ],
+  },
+  spell: {
+    preA1: [
+      ["🐶", "選出「狗」的正確拼字。", ["dgo", "dog", "god", "doog"], 1],
+      ["📘", "選出「書」的正確拼字。", ["book", "boko", "bok", "boak"], 0],
+      ["🔴", "選出「紅色」的正確拼字。", ["rade", "reed", "red", "rid"], 2],
+      ["✏️", "選出「鉛筆」的正確拼字。", ["pencil", "pensil", "pencel", "pencill"], 0],
+      ["🐟", "選出「魚」的正確拼字。", ["fesh", "fish", "fich", "fihs"], 1],
+      ["3️⃣", "選出數字 3 的正確拼字。", ["tree", "three", "there", "thre"], 1],
+      ["👧", "選出「姊妹」的正確拼字。", ["sister", "sistar", "sisetr", "sistor"], 0],
+      ["🥛", "選出「牛奶」的正確拼字。", ["malk", "melk", "milk", "milc"], 2],
+      ["🏠", "選出「房子」的正確拼字。", ["hause", "house", "houes", "hous"], 1],
+      ["😊", "選出「快樂的」正確拼字。", ["happy", "hapy", "heppy", "happi"], 0],
+    ],
+    a1: [
+      ["🍳", "選出「早餐」的正確拼字。", ["breakfest", "brekfast", "breakfast", "breakfasst"], 2],
+      ["🌤️", "選出「天氣」的正確拼字。", ["whether", "weather", "wether", "weater"], 1],
+      ["📚", "選出「圖書館」的正確拼字。", ["library", "libary", "librery", "libarary"], 0],
+      ["🗓️", "選出「星期四」的正確拼字。", ["Thurday", "Thursday", "Thusday", "Thersday"], 1],
+      ["🍝", "選出「餐廳」的正確拼字。", ["restaurant", "restarant", "restaurent", "resturant"], 0],
+      ["🏊", "選出「游泳」的正確拼字。", ["swiming", "swimming", "swimingg", "swemming"], 1],
+      ["🐘", "選出「大象」的正確拼字。", ["elefant", "elephent", "elephant", "elphant"], 2],
+      ["🧥", "選出「夾克」的正確拼字。", ["jacket", "jaket", "jackit", "jackat"], 0],
+      ["🌍", "選出「世界」的正確拼字。", ["world", "wordl", "werld", "wrold"], 0],
+      ["🧑‍🏫", "選出「老師」的正確拼字。", ["techer", "teacher", "teachar", "teecher"], 1],
+    ],
+  },
+  voice: {
+    preA1: [
+      ["🎙️", "遇到新朋友時，應該說哪一句？", ["Hello! My name is Amy.", "Good night.", "I'm hungry.", "It's a dog."], 0, "Hello! My name is Amy."],
+      ["🎙️", "別人問 How are you?，你可以怎麼回答？", ["I'm fine, thank you.", "I'm eight.", "It's red.", "Goodbye."], 0, "I'm fine, thank you."],
+      ["🎙️", "想介紹自己的年齡，應該說？", ["I am nine years old.", "I have nine books.", "It is nine.", "Nine is blue."], 0, "I am nine years old."],
+      ["🎙️", "想說「這是我的媽媽」，應該說？", ["She is a teacher.", "This is my mother.", "I like my mother.", "Her name is Amy."], 1, "This is my mother."],
+      ["🎙️", "想表達喜歡蘋果，應該說？", ["I see apples.", "I like apples.", "I have apples.", "I want red."], 1, "I like apples."],
+      ["🎙️", "想詢問物品顏色，應該說？", ["What is this?", "How old are you?", "What color is it?", "Where are you?"], 2, "What color is it?"],
+      ["🎙️", "想向別人道謝，應該說？", ["Sorry.", "Please.", "Thank you.", "Excuse me."], 2, "Thank you."],
+      ["🎙️", "睡前應該說哪一句？", ["Good morning.", "Good afternoon.", "Good evening.", "Good night."], 3, "Good night."],
+      ["🎙️", "想問「這是什麼？」，應該說？", ["Who is he?", "What is this?", "Where is it?", "How is it?"], 1, "What is this?"],
+      ["🎙️", "離開時可以說哪一句？", ["Goodbye!", "Welcome!", "Come in!", "Sit down!"], 0, "Goodbye!"],
+    ],
+    a1: [
+      ["🎙️", "想詢問現在時間，應該說？", ["What day is today?", "What time is it?", "How old are you?", "Where is it?"], 1, "What time is it?"],
+      ["🎙️", "在餐廳想點一份漢堡，應該說？", ["I like hamburgers.", "I have a hamburger.", "I'd like a hamburger, please.", "The hamburger is big."], 2, "I'd like a hamburger, please."],
+      ["🎙️", "想問洗手間在哪裡，應該說？", ["Where is the restroom?", "What is the restroom?", "Who is in the restroom?", "How is the restroom?"], 0, "Where is the restroom?"],
+      ["🎙️", "想表達自己會游泳，應該說？", ["I like swimming.", "I can swim.", "I am swimming.", "I swim yesterday."], 1, "I can swim."],
+      ["🎙️", "想問一件衣服多少錢，應該說？", ["How old is it?", "How many is it?", "How much is it?", "How tall is it?"], 2, "How much is it?"],
+      ["🎙️", "想邀請朋友一起打球，應該說？", ["Let's play ball.", "I play ball.", "Do you have a ball?", "The ball is big."], 0, "Let's play ball."],
+      ["🎙️", "想說今天是晴天，應該說？", ["It is Sunday.", "It is sunny today.", "I like the sun.", "Today is hot food."], 1, "It is sunny today."],
+      ["🎙️", "想問對方最喜歡的科目，應該說？", ["What is your favorite subject?", "Where is your subject?", "Who is your teacher?", "When is your class?"], 0, "What is your favorite subject?"],
+      ["🎙️", "想說自己每天七點起床，應該說？", ["I get up at seven every day.", "I go to bed at seven.", "I eat seven breakfasts.", "Seven is my number."], 0, "I get up at seven every day."],
+      ["🎙️", "聽不清楚時，可以禮貌地說？", ["Speak now.", "Say it.", "Could you say that again?", "You are wrong."], 2, "Could you say that again?"],
+    ],
+  },
+};
+
+const missionBanks = {
+  main: [
+    ["🏫", "A: What's your name?  B: ______", ["I'm ten.", "My name is Leo.", "I'm fine.", "It's Leo's."], 1],
+    ["👨‍👩‍👧", "This is my sister. ______ name is Tina.", ["His", "Her", "Its", "Your"], 1],
+    ["🟢", "The frog is ______.", ["green", "purple", "white", "orange"], 0],
+    ["📚", "I have two ______.", ["book", "books", "bookes", "a book"], 1],
+    ["🕘", "It is nine ______.", ["clock", "o'clock", "time", "hour"], 1],
+    ["🥪", "A: What do you want?  B: ______", ["I want a sandwich.", "I'm a sandwich.", "It is sandwich.", "I can sandwich."], 0],
+    ["☀️", "A: How's the weather?  B: ______", ["It's sunny.", "It's Monday.", "It's yellow.", "It's five."], 0],
+    ["⚽", "I can ______ soccer.", ["play", "plays", "playing", "played"], 0],
+    ["🚌", "I go to school ______ bus.", ["in", "on", "by", "at"], 2],
+    ["📍", "The ball is ______ the box.", ["under", "happy", "seven", "drink"], 0],
+  ],
+  support: [
+    ["🔊", "選出正確的問候回應。", ["Good morning!", "I'm a book.", "It is five.", "Blue."], 0, "Good morning!"],
+    ["🔊", "選出正確的自我介紹。", ["My name is Ben.", "This is red.", "I have seven.", "It is sunny."], 0, "My name is Ben."],
+    ["🔊", "選出正確的年齡回答。", ["I'm happy.", "I'm ten years old.", "I'm a student desk.", "It's ten cats."], 1, "I'm ten years old."],
+    ["🔊", "選出正確的喜好表達。", ["I like pizza.", "I am pizza.", "Pizza can swim.", "I pizza at seven."], 0, "I like pizza."],
+    ["🔊", "選出正確的能力表達。", ["I can sing.", "I am sing.", "I singing can.", "Sing is me."], 0, "I can sing."],
+    ["🔊", "選出正確的位置問句。", ["Where is my bag?", "What color old?", "How bag are?", "Who seven?"], 0, "Where is my bag?"],
+    ["🔊", "選出正確的時間問句。", ["What time is it?", "What it time?", "How time are?", "Where clock?"], 0, "What time is it?"],
+    ["🔊", "選出正確的點餐句。", ["I'd like some rice.", "Rice is I.", "I rice can.", "Some like rice I."], 0, "I'd like some rice."],
+    ["🔊", "選出正確的道謝回應。", ["You're welcome.", "You are ten.", "It is welcome book.", "Welcome is blue."], 0, "You're welcome."],
+    ["🔊", "選出禮貌請求重說的句子。", ["Could you say that again?", "Say again you could?", "Again is it?", "You say no."], 0, "Could you say that again?"],
+  ],
+  challenge: [
+    ["🧩", "重新組合：is / Where / library / the / ?", ["Where the library is?", "Where is the library?", "The library where is?", "Is where the library?"], 1],
+    ["🧩", "重新組合：do / What / like / you / ?", ["What you do like?", "Do what you like?", "What do you like?", "You like what do?"], 2],
+    ["🧩", "重新組合：at / get / seven / I / up", ["I get up at seven.", "At seven up I get.", "I at seven get up.", "Get I up seven at."], 0],
+    ["🧩", "選出 can 後方動詞使用正確的句子。", ["She can sings.", "She can sing.", "She cans sing.", "She sing can."], 1],
+    ["🧩", "選出 doesn't 用法正確的句子。", ["He don't like milk.", "He doesn't likes milk.", "He doesn't like milk.", "He not like milk."], 2],
+    ["🧩", "選出 There are 用法正確的句子。", ["There are two cats.", "There is two cats.", "There two cats are.", "Two cat there is."], 0],
+    ["🧩", "想詢問衣服價格，選出正確問句。", ["How much is the T-shirt?", "How many is the T-shirt?", "How old T-shirt?", "What much it is?"], 0],
+    ["🧩", "回答 What are you doing?，選出正確句子。", ["I read every day.", "I am reading.", "I can reading.", "I reading am."], 1],
+    ["🧩", "介紹爸爸的職業，選出正確句子。", ["My father is a doctor.", "My father are doctor.", "My father a doctor is.", "My father be doctor."], 0],
+    ["🧩", "想詢問生日日期，選出正確問句。", ["When is your birthday?", "When your birthday is?", "Is when birthday?", "Your birthday when?"], 0],
+  ],
+};
 
 const demoStudents = [
   { name: "林小晴", player: "晴空飛行員", seat: "08", level: "A1-2", days: 5, time: "2h 18m", completion: 86, focus: "語音引擎", status: "穩定進步" },
@@ -48,6 +220,7 @@ let authMode = "login";
 let currentPage = "home";
 let selectedStudent = 0;
 let cloudStudents = [];
+let gameState = null;
 
 if (Cloud.isConfigured() && data.currentUser) {
   const cloudUser = data.users.find(
@@ -251,64 +424,54 @@ function renderPlayerPage(user) {
 function renderPlayerHome(user) {
   return `
     ${playerHeader(user, `嗨，${escapeHTML(user.account)}！`, "今天也和 Toki 一起前進一點吧。")}
-    <section class="dashboard-grid">
-      <article class="card hero-card">
-        <span class="eyebrow">今日主線任務</span>
-        <h2>晨光鎮的招呼聲消失了！</h2>
-        <p>學會 5 個問候語，聽懂鎮民的線索，最後勇敢開口啟動第一道城門。</p>
-        <button class="primary-btn start-game">開始今日冒險 ＋80 XP</button>
-        <img src="assets/toki.png" alt="Toki" />
-      </article>
-      <article class="card week-card">
-        <h3>本週成長目標</h3>
-        <div class="ring" style="--value:68"><strong>68%</strong></div>
-        <div class="week-days">
-          ${["一", "二", "三", "四", "五", "六", "日"].map((day, i) => `<span class="day ${i < 5 ? "done" : ""}"><i>${i < 5 ? "✓" : i + 1}</i>${day}</span>`).join("")}
-        </div>
-        <p style="text-align:center;color:var(--muted);font-size:12px;margin:16px 0 0">再完成 2 次學習，本週目標就達成！</p>
-      </article>
-    </section>
-    ${renderTrainingSection()}
+    ${renderTrainingMap(user)}
     ${renderMissions()}`;
 }
 
-function renderTrainingSection() {
+function renderTrainingMap(user) {
   return `
-    <div class="section-title">
-      <div><h2>五大能力訓練館</h2><p>選擇今天想加強的英語能力。</p></div>
-      <button class="ghost-btn" data-page="training">查看全部 →</button>
-    </div>
-    <section class="training-overview">
-      <div class="training-grid">
-        ${abilities.map((a) => `
-          <button class="training-card start-game" style="color:${a.color}">
-            <span class="ability-icon" style="background:${a.color}">${a.icon}</span>
-            <h3>${a.name}</h3><small>${a.en}</small>
-            <div class="mini-progress"><span style="width:${a.value}%"></span></div>
-            <footer><span>能力值 ${a.value}</span><span>本週 ${a.trend}</span></footer>
+    <section class="training-map">
+      <div class="map-heading">
+        <div>
+          <span class="mission-tag">WonderGo 冒險區域</span>
+          <h2>五大能力訓練館</h2>
+          <p>Toki 已依照你的 ${escapeHTML(user.cefrLevel || "Pre-A1")} 程度準備任務。選一座場館，完成 10 題獲得 XP！</p>
+        </div>
+        <img src="assets/toki.png" alt="Toki 指引訓練館地圖" />
+      </div>
+      <div class="map-path" aria-hidden="true"></div>
+      <div class="map-locations">
+        ${abilities.map((ability, index) => `
+          <button class="map-location location-${index + 1}" data-ability="${ability.id}" style="--hall-color:${ability.color}">
+            <span class="map-pin">${index + 1}</span>
+            <span class="hall-art">${ability.scene}</span>
+            <span class="hall-copy">
+              <strong>${ability.name}</strong>
+              <small>${ability.description}</small>
+              <em>進入場館・10 題</em>
+            </span>
           </button>`).join("")}
       </div>
-      ${renderRadarCard("語力探測雷達", "掃描五大能力，鎖定下一個升級方向")}
     </section>`;
 }
 
 function renderMissions() {
   const missions = [
-    ["主線任務", "失落的招呼聲", "完成新內容，推進晨光鎮的故事。", "＋80 XP"],
-    ["補強任務", "勇敢開口", "再完成 2 次短句跟讀，補充語音引擎。", "＋50 XP"],
-    ["極限挑戰", "晶石快手", "用最強的語彙能量挑戰限時關卡。", "神秘寶箱"],
+    ["main", "主線任務", "晨光鎮通行考驗", "運用國小常見單字與句型，修復城鎮通道。", "句型綜合題"],
+    ["support", "補強任務", "回音訊號救援", "聽懂並選出正確的日常對話，補充聲音雷達。", "聽說應用題"],
+    ["challenge", "極限挑戰", "語序機關迷宮", "重新組合句子，破解高難度的語言機關。", "句型排列題"],
   ];
   return `
-    <div class="section-title"><div><h2>今日推薦</h2><p>Toki 根據你的能力表現安排了三項任務。</p></div></div>
+    <div class="section-title"><div><h2>今日推薦</h2><p>Toki 根據你的能力表現安排了三組不同題目。</p></div></div>
     <section class="mission-grid">
-      ${missions.map((m) => `<article class="card mission"><div class="mission-head"><span class="mission-tag">${m[0]}</span><b>${m[3]}</b></div><h3>${m[1]}</h3><p>${m[2]}</p><button class="secondary-btn start-game">前往任務</button></article>`).join("")}
+      ${missions.map((mission) => `<article class="card mission"><div class="mission-head"><span class="mission-tag">${mission[1]}</span><b>${mission[4]}</b></div><h3>${mission[2]}</h3><p>${mission[3]}</p><button class="secondary-btn mission-game" data-mission="${mission[0]}">前往任務</button></article>`).join("")}
     </section>`;
 }
 
 function renderTraining(user) {
   return `
-    ${playerHeader(user, "五大能力訓練館", "自由練習、弱項補強與教師指定任務都在這裡。")}
-    ${renderTrainingSection()}
+    ${playerHeader(user, "五大能力訓練館", "每座場館依照你的程度提供 10 題國小英語練習。")}
+    ${renderTrainingMap(user)}
     ${renderMissions()}`;
 }
 
@@ -423,7 +586,7 @@ function renderReport(user) {
 function renderComingSoon(user, title, subtitle, body, icon) {
   return `
     ${playerHeader(user, title, subtitle)}
-    <section class="card empty-page"><div><div class="big-icon">${icon}</div><h2>${subtitle}</h2><p style="color:var(--muted)">${body}</p><button class="primary-btn start-game">進入第一道關卡</button></div></section>`;
+    <section class="card empty-page"><div><div class="big-icon">${icon}</div><h2>${subtitle}</h2><p style="color:var(--muted)">${body}</p><button class="primary-btn" data-page="training">前往五大訓練館</button></div></section>`;
 }
 
 function teacherHeader(user, title, subtitle) {
@@ -506,22 +669,162 @@ function renderTeacherPlaceholder(user, title, body, icon) {
     <section class="card empty-page"><div><div class="big-icon">${icon}</div><h2>${title}</h2><p style="color:var(--muted)">${body}</p><button class="primary-btn mission-action">建立第一項內容</button></div></section>`;
 }
 
-function gameModal() {
+function getLevelKey(user) {
+  return String(user.cefrLevel || "Pre-A1").startsWith("Pre") ? "preA1" : "a1";
+}
+
+function normalizeQuestion(question) {
+  return {
+    visual: question[0],
+    prompt: question[1],
+    options: question[2],
+    answer: question[3],
+    speech: question[4] || "",
+  };
+}
+
+function startGame(mode, id) {
+  const user = currentUser();
+  const isMission = mode === "mission";
+  const ability = isMission
+    ? { main: "story", support: "echo", challenge: "spell" }[id]
+    : id;
+  const abilityInfo = abilities.find((item) => item.id === ability);
+  const source = isMission
+    ? missionBanks[id]
+    : questionBanks[id][getLevelKey(user)];
+
+  gameState = {
+    mode,
+    id,
+    ability,
+    title: isMission
+      ? { main: "晨光鎮通行考驗", support: "回音訊號救援", challenge: "語序機關迷宮" }[id]
+      : abilityInfo.name,
+    color: abilityInfo.color,
+    questions: source.slice(0, 10).map(normalizeQuestion),
+    index: 0,
+    correct: 0,
+    answered: false,
+    selected: null,
+    synced: false,
+  };
+  document.body.insertAdjacentHTML("beforeend", renderGameModal());
+  bindGameModalEvents();
+}
+
+function renderGameModal() {
+  return `<div class="game-modal" id="game-modal">${renderGameCard()}</div>`;
+}
+
+function renderGameCard() {
+  if (gameState.index >= gameState.questions.length) {
+    const xp = 20 + gameState.correct * 5;
+    return `
+      <article class="game-card result-card">
+        <div class="result-burst">🏆</div>
+        <span class="mission-tag">訓練完成</span>
+        <h2>${gameState.title}過關！</h2>
+        <p>你完成了 10 題練習，答對 <strong>${gameState.correct}</strong> 題。</p>
+        <div class="result-xp">＋${xp} XP</div>
+        <button class="primary-btn wide" id="claim-result">領取經驗值</button>
+      </article>`;
+  }
+
+  const question = gameState.questions[gameState.index];
+  const progress = ((gameState.index + 1) / gameState.questions.length) * 100;
+  const needsAudio = Boolean(question.speech);
   return `
-    <div class="game-modal" id="game-modal">
-      <article class="game-card">
-        <header><span class="mission-tag">語彙能量館</span><button class="ghost-btn" id="close-game">✕</button></header>
-        <div class="game-progress"><span></span></div>
-        <div class="question-image">🍎</div>
-        <h2>哪一個單字是「蘋果」？</h2>
-        <div class="options">
-          <button class="option wrong-answer">orange</button>
-          <button class="option correct-answer">apple</button>
-          <button class="option wrong-answer">grape</button>
-          <button class="option wrong-answer">banana</button>
+    <article class="game-card" style="--game-color:${gameState.color}">
+      <header>
+        <div><span class="mission-tag">${gameState.title}</span><small>第 ${gameState.index + 1}／10 題</small></div>
+        <button class="ghost-btn" id="close-game" aria-label="離開題目">✕</button>
+      </header>
+      <div class="game-progress"><span style="width:${progress}%;background:${gameState.color}"></span></div>
+      <div class="question-image">${question.visual}</div>
+      ${needsAudio ? `<button class="listen-button" id="play-question" data-speech="${escapeHTML(question.speech)}">🔊 播放英語</button>` : ""}
+      <h2>${question.prompt}</h2>
+      <div class="options">
+        ${question.options.map((option, index) => {
+          let stateClass = "";
+          if (gameState.answered && index === question.answer) stateClass = "correct";
+          if (gameState.answered && index === gameState.selected && index !== question.answer) stateClass = "wrong";
+          return `<button class="option answer-option ${stateClass}" data-answer="${index}" ${gameState.answered ? "disabled" : ""}>${option}</button>`;
+        }).join("")}
+      </div>
+      ${gameState.answered ? `
+        <div class="answer-feedback ${gameState.selected === question.answer ? "success" : "retry"}">
+          <b>${gameState.selected === question.answer ? "答對了！" : "再記一次就會了！"}</b>
+          <span>正確答案：${question.options[question.answer]}</span>
         </div>
-      </article>
-    </div>`;
+        <button class="primary-btn wide" id="next-question">${gameState.index === 9 ? "查看訓練成果" : "下一題"}</button>
+      ` : ""}
+    </article>`;
+}
+
+function speakEnglish(text) {
+  if (!("speechSynthesis" in window)) return toast("這個瀏覽器暫不支援語音播放。");
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = "en-US";
+  utterance.rate = 0.82;
+  window.speechSynthesis.speak(utterance);
+}
+
+function refreshGameModal() {
+  const modal = document.getElementById("game-modal");
+  if (!modal) return;
+  modal.innerHTML = renderGameCard();
+  bindGameModalEvents();
+}
+
+async function claimGameResult() {
+  if (gameState.synced) return;
+  gameState.synced = true;
+  const user = currentUser();
+  const xp = 20 + gameState.correct * 5;
+  const score = gameState.correct * 10;
+
+  try {
+    if (user.cloud) {
+      const updated = await Cloud.recordLearning(gameState.ability, xp, score);
+      user.xp = updated.xp;
+    } else {
+      user.xp = (user.xp || 0) + xp;
+    }
+    saveData();
+    document.getElementById("game-modal")?.remove();
+    render();
+    toast(`訓練完成！獲得 ${xp} XP`);
+  } catch {
+    gameState.synced = false;
+    toast("成績已保留，但雲端同步暫時失敗。");
+  }
+}
+
+function bindGameModalEvents() {
+  document.getElementById("close-game")?.addEventListener("click", () => {
+    window.speechSynthesis?.cancel();
+    document.getElementById("game-modal")?.remove();
+  });
+  document.getElementById("play-question")?.addEventListener("click", (event) => {
+    speakEnglish(event.currentTarget.dataset.speech);
+  });
+  document.querySelectorAll(".answer-option").forEach((button) => button.addEventListener("click", () => {
+    if (gameState.answered) return;
+    const selected = Number(button.dataset.answer);
+    gameState.selected = selected;
+    gameState.answered = true;
+    if (selected === gameState.questions[gameState.index].answer) gameState.correct += 1;
+    refreshGameModal();
+  }));
+  document.getElementById("next-question")?.addEventListener("click", () => {
+    gameState.index += 1;
+    gameState.answered = false;
+    gameState.selected = null;
+    refreshGameModal();
+  });
+  document.getElementById("claim-result")?.addEventListener("click", claimGameResult);
 }
 
 function bindEvents() {
@@ -626,29 +929,12 @@ function bindEvents() {
     render();
   });
 
-  document.querySelectorAll(".start-game").forEach((button) => button.addEventListener("click", () => {
-    document.body.insertAdjacentHTML("beforeend", gameModal());
-    document.getElementById("close-game").addEventListener("click", () => document.getElementById("game-modal").remove());
-    document.querySelector(".correct-answer").addEventListener("click", async () => {
-      const user = currentUser();
-      user.xp = (user.xp || 0) + 20;
-      saveData();
-      if (user.cloud) {
-        try {
-          await Cloud.recordLearning("word", 20);
-        } catch {
-          toast("答題完成，但雲端同步暫時失敗。");
-        }
-      }
-      document.getElementById("game-modal").remove();
-      render();
-      toast("答對了！語彙能量＋1，獲得 20 XP");
-    });
-    document.querySelectorAll(".wrong-answer").forEach((option) => option.addEventListener("click", () => {
-      option.style.borderColor = "#f06d73";
-      option.style.background = "#fff0f1";
-      toast("差一點！Toki 提示：開頭是 a。");
-    }));
+  document.querySelectorAll(".map-location").forEach((button) => button.addEventListener("click", () => {
+    startGame("ability", button.dataset.ability);
+  }));
+
+  document.querySelectorAll(".mission-game").forEach((button) => button.addEventListener("click", () => {
+    startGame("mission", button.dataset.mission);
   }));
 
   document.querySelectorAll(".student-row").forEach((row) => row.addEventListener("click", () => {
