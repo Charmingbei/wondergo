@@ -170,6 +170,12 @@ button {
   background: #fff;
 }
 
+.auth-register .auth-panel {
+  align-items: flex-start;
+  padding-top: 42px;
+  padding-bottom: 42px;
+}
+
 .auth-card {
   width: min(100%, 510px);
 }
@@ -264,6 +270,42 @@ button {
   box-shadow: 0 0 0 4px var(--purple-soft);
 }
 
+.password-field {
+  position: relative;
+}
+
+.password-field input {
+  padding-right: 66px;
+}
+
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  padding: 6px 9px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--purple);
+  background: var(--purple-soft);
+  font-size: 12px;
+  font-weight: 900;
+  transform: translateY(-50%);
+}
+
+.field-help {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.field-help.valid {
+  color: #218058;
+}
+
+.field-help.invalid {
+  color: #c34b50;
+}
+
 .primary-btn,
 .secondary-btn,
 .ghost-btn {
@@ -283,6 +325,13 @@ button {
 .primary-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 12px 25px rgba(86, 57, 216, 0.3);
+}
+
+.primary-btn:disabled {
+  cursor: wait;
+  opacity: 0.68;
+  transform: none;
+  box-shadow: none;
 }
 
 .primary-btn.wide {
@@ -1825,6 +1874,10 @@ td {
   .auth-panel,
   .main {
     padding: 22px 16px 45px;
+  }
+
+  .auth-register .auth-panel {
+    padding-top: 28px;
   }
 
   .form-grid,

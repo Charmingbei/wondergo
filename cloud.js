@@ -29,25 +29,51 @@ const Cloud = (() => {
     const currentConfig = config();
     if (!currentConfig) throw new Error("尚未設定 Supabase 連線");
     const session = getSession();
-    const response = await fetch(`${currentConfig.url}${path}`, {
-      ...options,
-      headers: {
-        apikey: currentConfig.key,
-        Authorization: `Bearer ${options.accessToken || session?.access_token || currentConfig.key}`,
-        "Content-Type": "application/json",
-        ...options.headers,
-      },
-    });
-    const body = response.status === 204 ? null : await response.json();
-    if (!response.ok) {
-      throw new Error(body?.msg || body?.message || body?.error_description || "雲端服務發生錯誤");
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 20000);
+    try {
+      const response = await fetch(`${currentConfig.url}${path}`, {
+        ...options,
+        signal: controller.signal,
+        headers: {
+          apikey: currentConfig.key,
+          Authorization: `Bearer ${options.accessToken || session?.access_token || currentConfig.key}`,
+          "Content-Type": "application/json",
+          ...options.headers,
+        },
+      });
+      const body = response.status === 204 ? null : await response.json();
+      if (!response.ok) {
+        throw new Error(body?.msg || body?.message || body?.error_description || "雲端服務發生錯誤");
+      }
+      return body;
+    } catch (error) {
+      if (error.name === "AbortError") {
+        throw new Error("雲端連線逾時，請確認網路後重新註冊。");
+      }
+      throw error;
+    } finally {
+      window.clearTimeout(timeout);
     }
-    return body;
   }
 
   function accountEmail(account) {
-    const safeAccount = account.toLowerCase().replace(/[^a-z0-9._-]/g, "-");
+    const normalizedAccount = account.trim().toLowerCase();
+    const isSimpleAccount =
+      /^[a-z0-9._-]+$/.test(normalizedAccount) && /[a-z0-9]/.test(normalizedAccount);
+    const safeAccount = isSimpleAccount
+      ? normalizedAccount
+      : `user-${accountHash(normalizedAccount)}`;
     return `${safeAccount}@ugnqqrhzixrjpyqgpckz.supabase.co`;
+  }
+
+  function accountHash(value) {
+    let hash = 2166136261;
+    for (const character of value) {
+      hash ^= character.codePointAt(0);
+      hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 0).toString(36);
   }
 
   async function register(values, role) {

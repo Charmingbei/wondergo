@@ -288,7 +288,7 @@ function renderAuth() {
   const isRegister = authMode === "register";
   const cloudReady = Cloud.isConfigured();
   return `
-    <main class="auth-shell">
+    <main class="auth-shell ${isRegister ? "auth-register" : ""}">
       <section class="brand-stage">
         <div class="logo"><span class="logo-mark">W</span> WonderGo <small>玩得夠</small></div>
         <div class="hero-copy">
@@ -340,6 +340,7 @@ function renderLoginForm(isTeacher) {
 }
 
 function renderRegisterForm(isTeacher) {
+  const minimumPasswordLength = Cloud.isConfigured() ? 8 : 4;
   return `
     <form id="register-form">
       <div class="form-grid">
@@ -352,10 +353,24 @@ function renderRegisterForm(isTeacher) {
           <input name="account" autocomplete="username" placeholder="設定下次登入帳號" required />
           ${isTeacher ? "" : '<small style="color:var(--muted)">玩家帳號將直接作為遊戲中的公開顯示名稱。</small>'}
         </div>
-        <div class="field"><label>密碼</label><input name="password" type="password" autocomplete="new-password" minlength="${Cloud.isConfigured() ? 8 : 4}" placeholder="至少 ${Cloud.isConfigured() ? 8 : 4} 個字元" required /></div>
-        <div class="field full"><label>再次確認密碼</label><input name="confirmPassword" type="password" autocomplete="new-password" required /></div>
+        <div class="field full">
+          <label for="register-password">密碼</label>
+          <div class="password-field">
+            <input id="register-password" name="password" type="password" autocomplete="new-password" minlength="${minimumPasswordLength}" maxlength="72" placeholder="至少 ${minimumPasswordLength} 個字元" aria-describedby="password-help" required />
+            <button class="password-toggle" type="button" data-password-toggle="register-password" aria-label="顯示密碼">顯示</button>
+          </div>
+          <small id="password-help" class="field-help">請輸入至少 ${minimumPasswordLength} 個字元。</small>
+        </div>
+        <div class="field full">
+          <label for="register-confirm-password">再次確認密碼</label>
+          <div class="password-field">
+            <input id="register-confirm-password" name="confirmPassword" type="password" autocomplete="new-password" minlength="${minimumPasswordLength}" maxlength="72" aria-describedby="password-match-help" required />
+            <button class="password-toggle" type="button" data-password-toggle="register-confirm-password" aria-label="顯示確認密碼">顯示</button>
+          </div>
+          <small id="password-match-help" class="field-help">請再次輸入相同密碼。</small>
+        </div>
       </div>
-      <button class="primary-btn wide" type="submit">完成註冊，進入 WonderGo</button>
+      <button class="primary-btn wide" id="register-submit" type="submit">完成註冊，進入 WonderGo</button>
     </form>`;
 }
 
@@ -866,6 +881,48 @@ function bindEvents() {
     render();
   }));
 
+  document.querySelectorAll("[data-password-toggle]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const input = document.getElementById(button.dataset.passwordToggle);
+      if (!input) return;
+      const shouldShow = input.type === "password";
+      input.type = shouldShow ? "text" : "password";
+      button.textContent = shouldShow ? "隱藏" : "顯示";
+      button.setAttribute("aria-label", shouldShow ? "隱藏密碼" : "顯示密碼");
+      input.focus();
+    });
+  });
+
+  const registerPassword = document.getElementById("register-password");
+  const registerConfirmPassword = document.getElementById("register-confirm-password");
+  const passwordHelp = document.getElementById("password-help");
+  const passwordMatchHelp = document.getElementById("password-match-help");
+  const updatePasswordStatus = () => {
+    if (!registerPassword || !registerConfirmPassword) return;
+    const minimumLength = Number(registerPassword.minLength);
+    const isLongEnough = registerPassword.value.length >= minimumLength;
+    passwordHelp.textContent = registerPassword.value
+      ? isLongEnough
+        ? "密碼長度符合要求。"
+        : `還需要 ${minimumLength - registerPassword.value.length} 個字元。`
+      : `請輸入至少 ${minimumLength} 個字元。`;
+    passwordHelp.className = `field-help ${registerPassword.value ? (isLongEnough ? "valid" : "invalid") : ""}`;
+
+    const hasConfirmation = Boolean(registerConfirmPassword.value);
+    const passwordsMatch = registerPassword.value === registerConfirmPassword.value;
+    registerConfirmPassword.setCustomValidity(
+      hasConfirmation && !passwordsMatch ? "兩次輸入的密碼不一致。" : "",
+    );
+    passwordMatchHelp.textContent = hasConfirmation
+      ? passwordsMatch
+        ? "兩次密碼一致。"
+        : "兩次輸入的密碼不一致。"
+      : "請再次輸入相同密碼。";
+    passwordMatchHelp.className = `field-help ${hasConfirmation ? (passwordsMatch ? "valid" : "invalid") : ""}`;
+  };
+  registerPassword?.addEventListener("input", updatePasswordStatus);
+  registerConfirmPassword?.addEventListener("input", updatePasswordStatus);
+
   document.getElementById("login-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -905,8 +962,17 @@ function bindEvents() {
 
   document.getElementById("register-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
+    updatePasswordStatus();
+    if (!event.currentTarget.reportValidity()) return;
+    const submitButton = document.getElementById("register-submit");
     const values = Object.fromEntries(new FormData(event.currentTarget));
-    if (values.password !== values.confirmPassword) return toast("兩次輸入的密碼不一致。");
+    values.account = values.account.trim();
+    if (values.password !== values.confirmPassword) {
+      registerConfirmPassword?.focus();
+      return toast("兩次輸入的密碼不一致。");
+    }
+    submitButton.disabled = true;
+    submitButton.textContent = "帳號建立中，請稍候...";
     if (Cloud.isConfigured()) {
       try {
         const user = await Cloud.register(values, authRole);
@@ -930,10 +996,16 @@ function bindEvents() {
         return;
       } catch (error) {
         toast(error.message);
+        submitButton.disabled = false;
+        submitButton.textContent = "重新註冊";
         return;
       }
     }
-    if (data.users.some((user) => user.account === values.account)) return toast("這個帳號已有人使用。");
+    if (data.users.some((user) => user.account === values.account)) {
+      submitButton.disabled = false;
+      submitButton.textContent = "重新註冊";
+      return toast("這個帳號已有人使用。");
+    }
     delete values.confirmPassword;
     const user = { ...values, role: authRole, xp: 0, level: 1 };
     data.users.push(user);
