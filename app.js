@@ -781,6 +781,11 @@ function refreshGameModal() {
 async function claimGameResult() {
   if (gameState.synced) return;
   gameState.synced = true;
+  const claimButton = document.getElementById("claim-result");
+  if (claimButton) {
+    claimButton.disabled = true;
+    claimButton.textContent = "經驗值領取中...";
+  }
   const user = currentUser();
   const xp = 20 + gameState.correct * 5;
   const score = gameState.correct * 10;
@@ -793,11 +798,17 @@ async function claimGameResult() {
       user.xp = (user.xp || 0) + xp;
     }
     saveData();
+    currentPage = "home";
     document.getElementById("game-modal")?.remove();
     render();
+    window.scrollTo({ top: 0, behavior: "smooth" });
     toast(`訓練完成！獲得 ${xp} XP`);
   } catch {
     gameState.synced = false;
+    if (claimButton) {
+      claimButton.disabled = false;
+      claimButton.textContent = "重新領取經驗值";
+    }
     toast("成績已保留，但雲端同步暫時失敗。");
   }
 }
