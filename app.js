@@ -535,7 +535,7 @@ function renderTrainingMap(user) {
         <div>
           <span class="mission-tag">WonderGo 冒險區域</span>
           <h2>五大能力訓練館</h2>
-          <p>Toki 已依照你的 ${escapeHTML(user.cefrLevel || "Pre-A1")} 程度準備任務。選一座場館，完成 10 題獲得 XP！</p>
+          <p>Toki 已依照你的 ${escapeHTML(user.cefrLevel || "Pre-A1")} 程度準備今日題組。每天更新，完成 10 題即可獲得 XP！</p>
         </div>
         <div class="toki-guide">
           <span>選一座場館出發吧！</span>
@@ -570,7 +570,7 @@ function renderMissions() {
   return `
     <section class="daily-quests">
       <div class="section-title">
-        <div><span class="quest-eyebrow">TODAY'S QUEST</span><h2>今日推薦</h2><p>Toki 根據你的能力表現安排了三組不同題目。</p></div>
+        <div><span class="quest-eyebrow">TODAY'S QUEST</span><h2>今日推薦</h2><p>依你的程度每日更新三組不同能力題目。</p></div>
         <span class="quest-reward">完成任務賺取 XP ✦</span>
       </div>
       <div class="mission-grid">
@@ -968,6 +968,46 @@ function getLevelKey(user) {
   return String(user.cefrLevel || "Pre-A1").startsWith("Pre") ? "preA1" : "a1";
 }
 
+function getDailyKey() {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Taipei",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  return formatter.format(new Date());
+}
+
+function hashSeed(value) {
+  let hash = 2166136261;
+  for (const character of value) {
+    hash ^= character.codePointAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function seededRandom(seed) {
+  let state = seed || 1;
+  return () => {
+    state += 0x6d2b79f5;
+    let value = state;
+    value = Math.imul(value ^ (value >>> 15), value | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function seededShuffle(items, seedText) {
+  const shuffled = [...items];
+  const random = seededRandom(hashSeed(seedText));
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(random() * (index + 1));
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+  }
+  return shuffled;
+}
+
 function normalizeQuestion(question) {
   return {
     visual: question[0],
@@ -976,6 +1016,26 @@ function normalizeQuestion(question) {
     answer: question[3],
     speech: question[4] || "",
   };
+}
+
+function shuffleQuestionOptions(question, seedText) {
+  const normalized = normalizeQuestion(question);
+  const correctAnswer = normalized.options[normalized.answer];
+  normalized.options = seededShuffle(normalized.options, `${seedText}:options`);
+  normalized.answer = normalized.options.indexOf(correctAnswer);
+  return normalized;
+}
+
+function dailyAbilityQuestions(user, ability, seedSuffix) {
+  const levelKey = getLevelKey(user);
+  const bank = questionBanks[ability];
+  const source = levelKey === "preA1"
+    ? bank.preA1
+    : [...bank.a1, ...bank.preA1];
+  const seed = `${getDailyKey()}:${user.account}:${user.cefrLevel}:${ability}:${seedSuffix}`;
+  return seededShuffle(source, seed)
+    .slice(0, 10)
+    .map((question, index) => shuffleQuestionOptions(question, `${seed}:${index}`));
 }
 
 function questionTypeFor(ability, prompt) {
@@ -1005,8 +1065,8 @@ function startGame(mode, id) {
     : id;
   const abilityInfo = abilities.find((item) => item.id === ability);
   const source = isMission
-    ? missionBanks[id]
-    : questionBanks[id][getLevelKey(user)];
+    ? dailyAbilityQuestions(user, ability, `mission:${id}`)
+    : dailyAbilityQuestions(user, ability, `hall:${id}`);
 
   gameState = {
     mode,
@@ -1016,7 +1076,7 @@ function startGame(mode, id) {
       ? { main: "晨光鎮通行考驗", support: "回音訊號救援", challenge: "語序機關迷宮" }[id]
       : abilityInfo.name,
     color: abilityInfo.color,
-    questions: source.slice(0, 10).map(normalizeQuestion),
+    questions: source,
     index: 0,
     correct: 0,
     answered: false,
@@ -1171,7 +1231,7 @@ function bindGameModalEvents() {
     if (selected === question.answer) gameState.correct += 1;
     gameState.attempts.push({
       ability: gameState.ability,
-      question_key: `${gameState.mode}:${gameState.id}:${gameState.index}`,
+      question_key: `${getDailyKey()}:${gameState.mode}:${gameState.id}:${gameState.index}`,
       prompt: question.prompt,
       question_type: questionTypeFor(gameState.ability, question.prompt),
       vocabulary: vocabularyFor(question),
