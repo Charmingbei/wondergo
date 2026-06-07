@@ -1093,6 +1093,16 @@ function refreshGameModal() {
   bindGameModalEvents();
 }
 
+function revealNextQuestionButton() {
+  if (!window.matchMedia("(max-width: 700px)").matches) return;
+  window.requestAnimationFrame(() => {
+    document.getElementById("next-question")?.scrollIntoView({
+      behavior: "smooth",
+      block: "end",
+    });
+  });
+}
+
 async function claimGameResult() {
   if (gameState.synced) return;
   gameState.synced = true;
@@ -1170,6 +1180,7 @@ function bindGameModalEvents() {
       is_correct: selected === question.answer,
     });
     refreshGameModal();
+    revealNextQuestionButton();
   }));
   document.getElementById("next-question")?.addEventListener("click", () => {
     gameState.index += 1;

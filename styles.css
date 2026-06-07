@@ -1791,16 +1791,24 @@ td {
   display: grid;
   place-items: center;
   padding: 20px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   background: rgba(28, 22, 65, 0.7);
   backdrop-filter: blur(8px);
+  -webkit-overflow-scrolling: touch;
 }
 
 .game-card {
   width: min(100%, 590px);
+  max-height: calc(100vh - 40px);
+  max-height: calc(100dvh - 40px);
   padding: 30px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   border-radius: 25px;
   background: #fff;
   box-shadow: var(--shadow);
+  -webkit-overflow-scrolling: touch;
 }
 
 .game-card header {
@@ -1919,6 +1927,16 @@ td {
 .answer-feedback.retry {
   color: #9b6316;
   background: #fff5df;
+}
+
+#next-question {
+  position: sticky;
+  bottom: 0;
+  z-index: 4;
+  margin-top: 4px;
+  box-shadow:
+    0 -12px 18px rgba(255, 255, 255, 0.94),
+    0 8px 18px rgba(86, 57, 216, 0.25);
 }
 
 .result-card {
@@ -2210,6 +2228,59 @@ td {
 
   .answer-feedback {
     flex-direction: column;
+  }
+
+  .game-modal {
+    place-items: start center;
+    padding:
+      max(8px, env(safe-area-inset-top))
+      8px
+      max(8px, env(safe-area-inset-bottom));
+  }
+
+  .game-card {
+    max-height: calc(100vh - 16px);
+    max-height: calc(100dvh - 16px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    padding: 20px 16px max(18px, env(safe-area-inset-bottom));
+    border-radius: 20px;
+  }
+
+  .game-progress {
+    margin: 15px 0 18px;
+  }
+
+  .question-image {
+    width: 82px;
+    height: 82px;
+    margin-bottom: 10px;
+    border-radius: 22px;
+    font-size: 42px;
+  }
+
+  .game-card h2 {
+    margin: 12px 0;
+    font-size: 19px;
+    line-height: 1.4;
+  }
+
+  .options {
+    gap: 9px;
+    margin-top: 14px;
+  }
+
+  .option {
+    min-height: 52px;
+    padding: 12px;
+  }
+
+  .answer-feedback {
+    margin: 12px 0 10px;
+    padding: 11px 13px;
+  }
+
+  #next-question {
+    bottom: max(0px, env(safe-area-inset-bottom));
+    min-height: 50px;
   }
 
   .top-stats {
