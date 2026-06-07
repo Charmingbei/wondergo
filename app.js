@@ -217,11 +217,20 @@ const defaultData = {
 let data = loadData();
 let authRole = "player";
 let authMode = "login";
+let recoveryToken = "";
 let currentPage = "home";
 let selectedStudent = 0;
 let cloudStudents = [];
 let staffDashboard = null;
+let adminAccountFilter = "all";
 let gameState = null;
+
+const recoveryParams = new URLSearchParams(window.location.hash.slice(1));
+if (recoveryParams.get("type") === "recovery" && recoveryParams.get("access_token")) {
+  recoveryToken = recoveryParams.get("access_token");
+  authMode = "reset";
+  window.history.replaceState({}, document.title, window.location.pathname);
+}
 
 if (Cloud.isConfigured() && data.currentUser) {
   const cloudUser = data.users.find(
@@ -317,9 +326,11 @@ function render() {
 function renderAuth() {
   const isTeacher = authRole === "teacher";
   const isRegister = authMode === "register";
+  const isForgot = authMode === "forgot";
+  const isReset = authMode === "reset";
   const cloudReady = Cloud.isConfigured();
   return `
-    <main class="auth-shell ${isRegister ? "auth-register" : ""}">
+    <main class="auth-shell ${isRegister || isForgot || isReset ? "auth-register" : ""}">
       <section class="brand-stage">
         <div class="logo"><span class="logo-mark">W</span> WonderGo <small>玩得夠</small></div>
         <div class="hero-copy">
@@ -332,17 +343,17 @@ function renderAuth() {
       </section>
       <section class="auth-panel">
         <div class="auth-card">
-          <h2>${isRegister ? `建立${isTeacher ? "教師" : "玩家"}帳號` : "歡迎回來！"}</h2>
-          <p>${isRegister ? "填寫基本資料，準備展開 WonderGo 旅程。" : "登入後從上一次的冒險紀錄繼續。"}</p>
-          <div class="role-switch">
+          <h2>${isReset ? "設定新密碼" : isForgot ? "忘記密碼" : isRegister ? `建立${isTeacher ? "教師" : "玩家"}帳號` : "歡迎回來！"}</h2>
+          <p>${isReset ? "請設定一組新的安全密碼。" : isForgot ? "輸入教師註冊時使用的信箱，我們會寄送安全重設連結。" : isRegister ? "填寫基本資料，準備展開 WonderGo 旅程。" : "登入後從上一次的冒險紀錄繼續。"}</p>
+          <div class="role-switch ${isReset ? "hidden" : ""}">
             <button data-role="player" class="${!isTeacher ? "active" : ""}">玩家入口</button>
             <button data-role="teacher" class="${isTeacher ? "active" : ""}">教師入口</button>
           </div>
-          <div class="auth-switch">
+          <div class="auth-switch ${isForgot || isReset ? "hidden" : ""}">
             <button data-mode="login" class="${!isRegister ? "active" : ""}">登入</button>
             <button data-mode="register" class="${isRegister ? "active" : ""}">第一次註冊</button>
           </div>
-          ${isRegister ? renderRegisterForm(isTeacher) : renderLoginForm(isTeacher)}
+          ${isReset ? renderResetPasswordForm() : isForgot ? renderForgotPasswordForm() : isRegister ? renderRegisterForm(isTeacher) : renderLoginForm(isTeacher)}
           <div class="demo-note" style="color:${cloudReady ? "#24855e" : "#a36b10"}">
             ${cloudReady ? "● 雲端資料庫已連線，帳號與學習紀錄會跨裝置同步。" : "○ 尚未設定 Supabase，目前使用本機原型資料。"}
           </div>
@@ -359,14 +370,43 @@ function renderLoginForm(isTeacher) {
   return `
     <form id="login-form">
       <div class="field">
-        <label>${isTeacher ? "教師帳號" : "玩家帳號"}</label>
-        <input name="account" autocomplete="username" placeholder="請輸入帳號" required />
+        <label>${isTeacher ? "教師帳號或註冊信箱" : "玩家帳號"}</label>
+        <input name="account" autocomplete="username" placeholder="${isTeacher ? "新教師請使用註冊信箱" : "請輸入帳號"}" required />
       </div>
       <div class="field">
         <label>密碼</label>
         <input name="password" type="password" autocomplete="current-password" placeholder="請輸入密碼" required />
       </div>
       <button class="primary-btn wide" type="submit">登入，繼續冒險</button>
+      <button class="text-button" type="button" data-mode="forgot">忘記密碼？使用註冊信箱重設</button>
+    </form>`;
+}
+
+function renderForgotPasswordForm() {
+  return `
+    <form id="forgot-password-form">
+      <div class="field">
+        <label>教師註冊信箱</label>
+        <input name="email" type="email" autocomplete="email" placeholder="teacher@example.com" required />
+        <small class="field-help">為保護帳號，無論信箱是否存在都會顯示相同完成訊息。</small>
+      </div>
+      <button class="primary-btn wide" id="forgot-submit" type="submit">寄送密碼重設信</button>
+      <button class="text-button" type="button" data-mode="login">返回登入</button>
+    </form>`;
+}
+
+function renderResetPasswordForm() {
+  return `
+    <form id="reset-password-form">
+      <div class="field">
+        <label>新密碼</label>
+        <input name="password" type="password" autocomplete="new-password" minlength="8" maxlength="72" placeholder="至少 8 個字元" required />
+      </div>
+      <div class="field">
+        <label>再次確認新密碼</label>
+        <input name="confirmPassword" type="password" autocomplete="new-password" minlength="8" maxlength="72" required />
+      </div>
+      <button class="primary-btn wide" id="reset-submit" type="submit">更新密碼</button>
     </form>`;
 }
 
@@ -379,6 +419,7 @@ function renderRegisterForm(isTeacher) {
         <div class="field"><label>${isTeacher ? "教學班級" : "班級"}</label><input name="className" placeholder="例：六年一班" required /></div>
         ${isTeacher ? "" : '<div class="field"><label>座號</label><input name="seat" placeholder="例：08" required /></div>'}
         <div class="field ${isTeacher ? "" : ""}"><label>真實姓名</label><input name="realName" placeholder="僅教師與管理員可見" required /></div>
+        ${isTeacher ? '<div class="field full"><label>教師信箱</label><input name="email" type="email" autocomplete="email" placeholder="用於登入及忘記密碼" required /><small class="field-help">註冊完成後，請使用此信箱登入。</small></div>' : ""}
         <div class="field ${isTeacher ? "" : "full"}">
           <label>${isTeacher ? "教師帳號" : "玩家帳號"}</label>
           <input name="account" autocomplete="username" placeholder="設定下次登入帳號" required />
@@ -734,22 +775,36 @@ function renderPendingTeachers(teachers) {
 
 function renderAdminAccounts(user) {
   const dashboard = staffDashboard || { users: [], pendingTeachers: [] };
+  const filteredUsers = dashboard.users.filter((account) =>
+    adminAccountFilter === "all" ||
+    (adminAccountFilter === "teacher" && account.role === "teacher") ||
+    (adminAccountFilter === "player" && account.role === "player"),
+  );
   return `
     ${teacherHeader(user, "帳號與申請", "查看所有學生、教師及管理員帳號")}
     ${renderPendingTeachers(dashboard.pendingTeachers)}
     <article class="card panel" style="margin-top:20px">
-      <div class="section-title" style="margin:0 0 10px"><div><h2>所有使用者</h2><p>共 ${dashboard.users.length} 個帳號</p></div></div>
+      <div class="section-title account-list-heading" style="margin:0 0 10px">
+        <div><h2>所有使用者</h2><p>目前顯示 ${filteredUsers.length} 個帳號</p></div>
+        <div class="filter-buttons">
+          <button data-account-filter="all" class="${adminAccountFilter === "all" ? "active" : ""}">全部</button>
+          <button data-account-filter="teacher" class="${adminAccountFilter === "teacher" ? "active" : ""}">教師</button>
+          <button data-account-filter="player" class="${adminAccountFilter === "player" ? "active" : ""}">學生</button>
+        </div>
+      </div>
       <div class="table-wrap"><table>
-        <thead><tr><th>身分</th><th>姓名／玩家</th><th>帳號</th><th>學校</th><th>班級</th><th>狀態</th></tr></thead>
-        <tbody>${dashboard.users.map((account) => `
+        <thead><tr><th>身分</th><th>姓名／玩家</th><th>帳號</th><th>信箱</th><th>學校</th><th>班級</th><th>密碼狀態</th><th>狀態</th></tr></thead>
+        <tbody>${filteredUsers.map((account) => `
           <tr>
             <td><span class="status role-${account.role}">${account.role === "player" ? "學生" : account.role === "teacher" ? "教師" : "管理員"}</span></td>
             <td><b>${escapeHTML(account.name)}</b></td>
             <td>${escapeHTML(account.account)}</td>
+            <td>${account.email ? escapeHTML(account.email) : "未設定"}</td>
             <td>${escapeHTML(account.school)}</td>
             <td>${escapeHTML(account.className)}</td>
+            <td><span class="password-status">••••••••</span><small class="password-date">${account.passwordChangedAt ? `更新：${new Date(account.passwordChangedAt).toLocaleDateString("zh-TW")}` : "尚無更新紀錄"}</small></td>
             <td><span class="status ${account.role === "teacher" && !account.approved ? "warn" : ""}">${account.role === "teacher" && !account.approved ? "待審核" : "可使用"}</span></td>
-          </tr>`).join("")}</tbody>
+          </tr>`).join("") || '<tr><td colspan="8" class="empty-cell">此分類目前沒有使用者</td></tr>'}</tbody>
       </table></div>
     </article>`;
 }
@@ -1142,6 +1197,48 @@ function bindEvents() {
   registerPassword?.addEventListener("input", updatePasswordStatus);
   registerConfirmPassword?.addEventListener("input", updatePasswordStatus);
 
+  document.getElementById("forgot-password-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const button = document.getElementById("forgot-submit");
+    const email = new FormData(event.currentTarget).get("email");
+    button.disabled = true;
+    button.textContent = "重設信寄送中...";
+    try {
+      await Cloud.requestPasswordReset(email);
+      authMode = "login";
+      authRole = "teacher";
+      render();
+      setTimeout(() => toast("若此信箱已註冊，密碼重設信會在幾分鐘內送達。"), 50);
+    } catch (error) {
+      button.disabled = false;
+      button.textContent = "重新寄送密碼重設信";
+      toast(`寄送失敗：${error.message}`);
+    }
+  });
+
+  document.getElementById("reset-password-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const values = Object.fromEntries(new FormData(event.currentTarget));
+    if (values.password !== values.confirmPassword) {
+      return toast("兩次輸入的新密碼不一致。");
+    }
+    const button = document.getElementById("reset-submit");
+    button.disabled = true;
+    button.textContent = "密碼更新中...";
+    try {
+      await Cloud.updateRecoveredPassword(recoveryToken, values.password);
+      recoveryToken = "";
+      authMode = "login";
+      authRole = "teacher";
+      render();
+      setTimeout(() => toast("密碼已更新，請使用新密碼登入。"), 50);
+    } catch (error) {
+      button.disabled = false;
+      button.textContent = "重新更新密碼";
+      toast(error.message);
+    }
+  });
+
   document.getElementById("login-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -1285,6 +1382,13 @@ function bindEvents() {
         button.textContent = originalText;
         toast(`核准失敗：${error.message}`);
       }
+    });
+  });
+
+  document.querySelectorAll("[data-account-filter]").forEach((button) => {
+    button.addEventListener("click", () => {
+      adminAccountFilter = button.dataset.accountFilter;
+      render();
     });
   });
 }

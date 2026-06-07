@@ -87,19 +87,58 @@ const Cloud = (() => {
         className: values.className,
         seat: values.seat || "",
         realName: values.realName,
+        email: values.email || "",
         displayName: role === "player" ? values.account : "",
       }),
     });
-    return login(values.account, values.password);
+    return login(role === "teacher" ? values.email : values.account, values.password);
   }
 
-  async function login(account, password) {
+  async function login(identifier, password) {
+    const email = identifier.includes("@")
+      ? identifier.trim().toLowerCase()
+      : accountEmail(identifier);
     const result = await request("/auth/v1/token?grant_type=password", {
       method: "POST",
-      body: JSON.stringify({ email: accountEmail(account), password }),
+      body: JSON.stringify({ email, password }),
     });
     setSession(result);
     return loadCurrentProfile(result.access_token);
+  }
+
+  async function requestPasswordReset(email) {
+    await request("/auth/v1/recover", {
+      method: "POST",
+      body: JSON.stringify({
+        email: email.trim().toLowerCase(),
+        redirect_to: "https://charmingbei.github.io/wondergo/",
+      }),
+    });
+  }
+
+  async function updateRecoveredPassword(accessToken, password) {
+    const currentConfig = config();
+    if (!currentConfig) throw new Error("尚未設定 Supabase 連線");
+    const response = await fetch(`${currentConfig.url}/auth/v1/user`, {
+      method: "PUT",
+      headers: {
+        apikey: currentConfig.key,
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ password }),
+    });
+    const body = await response.json();
+    if (!response.ok) {
+      throw new Error(body?.message || body?.error_description || "密碼更新失敗");
+    }
+    setSession({ access_token: accessToken, user: body });
+    await request("/rest/v1/rpc/mark_password_changed", {
+      method: "POST",
+      accessToken,
+      body: "{}",
+    });
+    setSession(null);
   }
 
   async function loadCurrentProfile(accessToken) {
@@ -242,7 +281,7 @@ const Cloud = (() => {
     monday.setHours(0, 0, 0, 0);
     const since = encodeURIComponent(monday.toISOString());
     const [profiles, progress, events, attempts] = await Promise.all([
-      request("/rest/v1/profiles?select=id,role,account,school,class_name,seat,real_name,display_name,xp,adventure_level,cefr_level,is_approved,created_at&order=created_at.desc"),
+      request("/rest/v1/profiles?select=id,role,account,school,class_name,seat,real_name,display_name,contact_email,password_changed_at,xp,adventure_level,cefr_level,is_approved,created_at&order=created_at.desc"),
       request("/rest/v1/ability_progress?select=*"),
       request(`/rest/v1/learning_events?created_at=gte.${since}&select=user_id,ability,score,xp_earned,duration_seconds,created_at&order=created_at.desc`),
       request(`/rest/v1/question_attempts?created_at=gte.${since}&select=user_id,ability,question_type,vocabulary,prompt,is_correct,created_at&order=created_at.desc`),
@@ -280,6 +319,8 @@ const Cloud = (() => {
         level: profile.cefr_level,
         xp: profile.xp,
         approved: profile.is_approved,
+        email: profile.contact_email || "",
+        passwordChangedAt: profile.password_changed_at,
         createdAt: profile.created_at,
         days: studyDays,
         taskCount: userEvents.length,
@@ -419,11 +460,13 @@ const Cloud = (() => {
       className: profile.class_name,
       seat: profile.seat,
       realName: profile.real_name,
+      email: profile.contact_email || "",
       displayName: profile.role === "player" ? profile.account : profile.display_name,
       xp: profile.xp,
       level: profile.adventure_level,
       cefrLevel: profile.cefr_level,
       approved: profile.is_approved,
+      passwordChangedAt: profile.password_changed_at,
       cloud: true,
     };
   }
@@ -432,6 +475,8 @@ const Cloud = (() => {
     isConfigured,
     register,
     login,
+    requestPasswordReset,
+    updateRecoveredPassword,
     restoreSession,
     loadClassStudents,
     loadStaffDashboard,

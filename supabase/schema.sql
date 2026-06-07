@@ -12,6 +12,8 @@ create table public.profiles (
   seat text,
   real_name text not null,
   display_name text,
+  contact_email text,
+  password_changed_at timestamptz,
   xp integer not null default 0 check (xp >= 0),
   adventure_level integer not null default 1 check (adventure_level >= 1),
   cefr_level text not null default 'Pre-A1',
@@ -68,7 +70,8 @@ begin
   new_role := coalesce((new.raw_user_meta_data ->> 'role')::public.user_role, 'player');
 
   insert into public.profiles (
-    id, role, account, school, class_name, seat, real_name, display_name, is_approved
+    id, role, account, school, class_name, seat, real_name, display_name,
+    contact_email, password_changed_at, is_approved
   )
   values (
     new.id,
@@ -82,6 +85,8 @@ begin
       when new_role = 'player' then lower(new.raw_user_meta_data ->> 'account')
       else nullif(new.raw_user_meta_data ->> 'display_name', '')
     end,
+    nullif(lower(new.raw_user_meta_data ->> 'contact_email'), ''),
+    now(),
     new_role <> 'teacher'
   );
 
@@ -238,6 +243,9 @@ grant execute on function public.record_learning_event(text, text, numeric, inte
 to authenticated;
 
 create index profiles_class_idx on public.profiles (school, class_name);
+create unique index profiles_contact_email_unique_idx
+on public.profiles (lower(contact_email))
+where contact_email is not null;
 create index learning_events_user_date_idx on public.learning_events (user_id, created_at desc);
 create index assignments_class_idx on public.teacher_assignments (school, class_name);
 create index assignments_teacher_idx on public.teacher_assignments (teacher_id);

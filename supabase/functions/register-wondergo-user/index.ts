@@ -48,6 +48,7 @@ Deno.serve(async (request) => {
     const className = String(body.className ?? "").trim();
     const seat = String(body.seat ?? "").trim();
     const realName = String(body.realName ?? "").trim();
+    const contactEmail = String(body.email ?? "").trim().toLowerCase();
 
     if (account.length < 2 || account.length > 30) {
       return response(400, { message: "玩家帳號請輸入 2 至 30 個字元。" });
@@ -61,6 +62,9 @@ Deno.serve(async (request) => {
     if (role === "player" && !seat) {
       return response(400, { message: "請填寫座號。" });
     }
+    if (role === "teacher" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail)) {
+      return response(400, { message: "請輸入有效的教師信箱。" });
+    }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -72,7 +76,7 @@ Deno.serve(async (request) => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
     const { data, error } = await admin.auth.admin.createUser({
-      email: accountEmail(account),
+      email: role === "teacher" ? contactEmail : accountEmail(account),
       password,
       email_confirm: true,
       user_metadata: {
@@ -82,6 +86,7 @@ Deno.serve(async (request) => {
         class_name: className,
         seat,
         real_name: realName,
+        contact_email: role === "teacher" ? contactEmail : "",
         display_name: role === "player" ? account : "",
       },
     });

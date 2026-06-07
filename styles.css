@@ -37,6 +37,10 @@ button {
   cursor: pointer;
 }
 
+.hidden {
+  display: none !important;
+}
+
 .auth-shell {
   min-height: 100vh;
   display: grid;
@@ -336,6 +340,21 @@ button {
 
 .primary-btn.wide {
   width: 100%;
+}
+
+.text-button {
+  width: 100%;
+  padding: 12px;
+  border: 0;
+  color: var(--purple);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.text-button:hover {
+  text-decoration: underline;
 }
 
 .secondary-btn {
@@ -1452,6 +1471,51 @@ button {
   background: linear-gradient(150deg, #fffdf8, #fff9ec);
 }
 
+.account-list-heading {
+  gap: 16px;
+}
+
+.filter-buttons {
+  display: flex;
+  gap: 6px;
+  padding: 5px;
+  border-radius: 13px;
+  background: #f1eff8;
+}
+
+.filter-buttons button {
+  padding: 8px 13px;
+  border: 0;
+  border-radius: 9px;
+  color: var(--muted);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.filter-buttons button.active {
+  color: var(--purple);
+  background: #fff;
+  box-shadow: 0 3px 10px rgba(60, 44, 130, 0.1);
+}
+
+.password-status,
+.password-date {
+  display: block;
+}
+
+.password-status {
+  color: var(--ink);
+  font-weight: 900;
+  letter-spacing: 1px;
+}
+
+.password-date {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
 .empty-cell,
 .empty-hint {
   color: var(--muted);
@@ -2015,6 +2079,11 @@ td {
 
   .topbar {
     align-items: flex-start;
+  }
+
+  .account-list-heading {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .training-map {
