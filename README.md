@@ -61,6 +61,9 @@ WonderGo 已連接 Supabase 專案 `Charmingbei's Project`。
 
 新註冊教師預設為待核准，避免冒用教師身分查看兒少資料。可在 Supabase `profiles` 表將該教師的 `is_approved` 設為 `true`。
 
+管理員不開放前台註冊。先建立教師帳號，再於 Supabase 將該帳號的
+`role` 改為 `admin`、`is_approved` 改為 `true`，之後從「教師入口」登入。
+
 後續可再串接口說錄音 Storage、語音評分服務及完整教材編輯器。
 
 ## GitHub Pages

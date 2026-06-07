@@ -248,6 +248,10 @@ function currentUser() {
   return data.users.find((user) => user.account === data.currentUser?.account && user.role === data.currentUser?.role);
 }
 
+function isStaffRole(role) {
+  return role === "teacher" || role === "admin";
+}
+
 function emptyAbilityValues() {
   return { word: 0, echo: 0, story: 0, spell: 0, voice: 0 };
 }
@@ -278,7 +282,7 @@ function activeStudents() {
 }
 
 async function refreshTeacherStudents(user) {
-  if (!user?.cloud || user.role !== "teacher") return;
+  if (!user?.cloud || !isStaffRole(user.role)) return;
   try {
     cloudStudents = await Cloud.loadClassStudents(user.school, user.className);
   } catch (error) {
@@ -401,7 +405,7 @@ function renderRegisterForm(isTeacher) {
 
 function renderApp() {
   const user = currentUser();
-  const isTeacher = user.role === "teacher";
+  const isTeacher = isStaffRole(user.role);
   return `
     <div class="app-shell">
       ${renderSidebar(user, isTeacher)}
@@ -436,7 +440,7 @@ function renderSidebar(user, isTeacher) {
       </nav>
       <div class="sidebar-user">
         <span class="avatar">${escapeHTML((isTeacher ? user.realName : user.account).slice(0, 1))}</span>
-        <div><strong>${escapeHTML(isTeacher ? user.realName : user.account)}</strong><small>${isTeacher ? `${user.className} 教師` : `Lv.${user.level || 1} 探索者`}</small></div>
+        <div><strong>${escapeHTML(isTeacher ? user.realName : user.account)}</strong><small>${isTeacher ? (user.role === "admin" ? "WonderGo 管理員" : `${user.className} 教師`) : `Lv.${user.level || 1} 探索者`}</small></div>
       </div>
     </aside>`;
 }
@@ -975,7 +979,10 @@ function bindEvents() {
     if (Cloud.isConfigured()) {
       try {
         const user = await Cloud.login(form.get("account"), form.get("password"));
-        if (user.role !== authRole) {
+        const roleMatches = authRole === "teacher"
+          ? isStaffRole(user.role)
+          : user.role === "player";
+        if (!roleMatches) {
           await Cloud.logout();
           return toast(`這不是${authRole === "teacher" ? "教師" : "玩家"}帳號。`);
         }
@@ -988,7 +995,7 @@ function bindEvents() {
         );
         data.users.push(user);
         data.currentUser = { account: user.account, role: user.role };
-        currentPage = user.role === "teacher" ? "overview" : "home";
+        currentPage = isStaffRole(user.role) ? "overview" : "home";
         saveData();
         await refreshTeacherStudents(user);
         render();
@@ -1001,7 +1008,7 @@ function bindEvents() {
     const user = data.users.find((item) => item.role === authRole && item.account === form.get("account") && item.password === form.get("password"));
     if (!user) return toast("帳號或密碼不正確，請再試一次。");
     data.currentUser = { account: user.account, role: user.role };
-    currentPage = user.role === "teacher" ? "overview" : "home";
+    currentPage = isStaffRole(user.role) ? "overview" : "home";
     saveData();
     render();
   });
@@ -1034,7 +1041,7 @@ function bindEvents() {
         );
         data.users.push(user);
         data.currentUser = { account: user.account, role: user.role };
-        currentPage = user.role === "teacher" ? "overview" : "home";
+        currentPage = isStaffRole(user.role) ? "overview" : "home";
         saveData();
         await refreshTeacherStudents(user);
         render();
@@ -1056,7 +1063,7 @@ function bindEvents() {
     const user = { ...values, role: authRole, xp: 0, level: 1 };
     data.users.push(user);
     data.currentUser = { account: user.account, role: user.role };
-    currentPage = user.role === "teacher" ? "overview" : "home";
+    currentPage = isStaffRole(user.role) ? "overview" : "home";
     saveData();
     render();
     setTimeout(() => toast("註冊成功，歡迎來到 WonderGo！"), 50);
@@ -1099,7 +1106,7 @@ render();
 
 if (currentUser()?.cloud) {
   const user = currentUser();
-  const refresh = user.role === "teacher"
+  const refresh = isStaffRole(user.role)
     ? refreshTeacherStudents(user)
     : refreshPlayerLearning(user);
   refresh.then(render);
