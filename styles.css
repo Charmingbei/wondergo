@@ -1516,6 +1516,47 @@ button {
   font-size: 10px;
 }
 
+.admin-edit-card {
+  width: min(100%, 680px);
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+}
+
+.admin-edit-card h2 {
+  margin: 5px 0 0;
+  text-align: left;
+}
+
+.admin-edit-card form {
+  margin-top: 22px;
+}
+
+.approval-check {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 13px;
+  border-radius: 12px;
+  color: var(--ink);
+  background: #f8f7fc;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.approval-check input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--purple);
+}
+
+.editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 12px;
+}
+
 .empty-cell,
 .empty-hint {
   color: var(--muted);

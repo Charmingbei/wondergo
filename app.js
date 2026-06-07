@@ -793,7 +793,7 @@ function renderAdminAccounts(user) {
         </div>
       </div>
       <div class="table-wrap"><table>
-        <thead><tr><th>身分</th><th>姓名／玩家</th><th>帳號</th><th>信箱</th><th>學校</th><th>班級</th><th>密碼狀態</th><th>狀態</th></tr></thead>
+        <thead><tr><th>身分</th><th>姓名／玩家</th><th>帳號</th><th>信箱</th><th>學校</th><th>班級</th><th>密碼狀態</th><th>狀態</th><th>操作</th></tr></thead>
         <tbody>${filteredUsers.map((account) => `
           <tr>
             <td><span class="status role-${account.role}">${account.role === "player" ? "學生" : account.role === "teacher" ? "教師" : "管理員"}</span></td>
@@ -804,9 +804,44 @@ function renderAdminAccounts(user) {
             <td>${escapeHTML(account.className)}</td>
             <td><span class="password-status">••••••••</span><small class="password-date">${account.passwordChangedAt ? `更新：${new Date(account.passwordChangedAt).toLocaleDateString("zh-TW")}` : "尚無更新紀錄"}</small></td>
             <td><span class="status ${account.role === "teacher" && !account.approved ? "warn" : ""}">${account.role === "teacher" && !account.approved ? "待審核" : "可使用"}</span></td>
-          </tr>`).join("") || '<tr><td colspan="8" class="empty-cell">此分類目前沒有使用者</td></tr>'}</tbody>
+            <td><button class="secondary-btn edit-user" data-user="${account.id}">編輯資料</button></td>
+          </tr>`).join("") || '<tr><td colspan="9" class="empty-cell">此分類目前沒有使用者</td></tr>'}</tbody>
       </table></div>
     </article>`;
+}
+
+function renderUserEditor(account) {
+  const roleLabel = account.role === "player" ? "學生" : account.role === "teacher" ? "教師" : "管理員";
+  return `
+    <div class="game-modal admin-edit-modal" id="admin-edit-modal">
+      <article class="game-card admin-edit-card">
+        <header>
+          <div><span class="mission-tag">${roleLabel}資料</span><h2>編輯 ${escapeHTML(account.account)}</h2></div>
+          <button class="ghost-btn" id="close-user-editor" type="button" aria-label="關閉">✕</button>
+        </header>
+        <form id="admin-user-form">
+          <input type="hidden" name="userId" value="${account.id}" />
+          <div class="form-grid">
+            <div class="field full"><label>帳號</label><input value="${escapeHTML(account.account)}" disabled /><small class="field-help">帳號為登入識別，不開放直接修改。</small></div>
+            <div class="field"><label>身分</label><input value="${roleLabel}" disabled /></div>
+            <div class="field"><label>真實姓名</label><input name="realName" value="${escapeHTML(account.name)}" required /></div>
+            <div class="field"><label>學校</label><input name="school" value="${escapeHTML(account.school)}" required /></div>
+            <div class="field"><label>班級</label><input name="className" value="${escapeHTML(account.className)}" required /></div>
+            ${account.role === "player" ? `
+              <div class="field"><label>座號</label><input name="seat" value="${escapeHTML(account.seat)}" required /></div>
+              <div class="field"><label>英語程度</label><select name="cefrLevel">${["Pre-A1", "A1", "A2", "B1", "B2"].map((level) => `<option ${account.level === level ? "selected" : ""}>${level}</option>`).join("")}</select></div>
+            ` : `
+              <div class="field full"><label>信箱</label><input name="email" type="email" value="${escapeHTML(account.email)}" placeholder="補登登入及忘記密碼信箱" /></div>
+              ${account.role === "teacher" ? `<label class="approval-check"><input name="approved" type="checkbox" ${account.approved ? "checked" : ""} /> 核准教師查看班級資料</label>` : ""}
+            `}
+          </div>
+          <div class="editor-actions">
+            <button class="ghost-btn" id="cancel-user-editor" type="button">取消</button>
+            <button class="primary-btn" id="save-user-editor" type="submit">儲存修改</button>
+          </div>
+        </form>
+      </article>
+    </div>`;
 }
 
 function renderAdminClasses(user) {
@@ -1390,6 +1425,47 @@ function bindEvents() {
       adminAccountFilter = button.dataset.accountFilter;
       render();
     });
+  });
+
+  document.querySelectorAll(".edit-user").forEach((button) => {
+    button.addEventListener("click", () => {
+      const account = staffDashboard?.users.find((item) => item.id === button.dataset.user);
+      if (!account) return toast("找不到此使用者資料。");
+      document.body.insertAdjacentHTML("beforeend", renderUserEditor(account));
+      bindUserEditorEvents(account);
+    });
+  });
+}
+
+function bindUserEditorEvents(account) {
+  const closeEditor = () => document.getElementById("admin-edit-modal")?.remove();
+  document.getElementById("close-user-editor")?.addEventListener("click", closeEditor);
+  document.getElementById("cancel-user-editor")?.addEventListener("click", closeEditor);
+  document.getElementById("admin-edit-modal")?.addEventListener("click", (event) => {
+    if (event.target.id === "admin-edit-modal") closeEditor();
+  });
+  document.getElementById("admin-user-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const button = document.getElementById("save-user-editor");
+    const form = new FormData(event.currentTarget);
+    const values = Object.fromEntries(form);
+    values.approved = form.get("approved") === "on";
+    values.email ||= "";
+    values.seat ||= "";
+    values.cefrLevel ||= account.level || "Pre-A1";
+    button.disabled = true;
+    button.textContent = "儲存中...";
+    try {
+      await Cloud.updateUserAsAdmin(values);
+      await refreshTeacherStudents(currentUser());
+      closeEditor();
+      render();
+      toast("使用者資料已更新，班級配對也已重新整理。");
+    } catch (error) {
+      button.disabled = false;
+      button.textContent = "重新儲存";
+      toast(error.message);
+    }
   });
 }
 

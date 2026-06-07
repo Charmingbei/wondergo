@@ -414,6 +414,13 @@ const Cloud = (() => {
     return Array.isArray(rows) ? rows[0] : rows;
   }
 
+  async function updateUserAsAdmin(values) {
+    return request("/functions/v1/admin-update-wondergo-user", {
+      method: "POST",
+      body: JSON.stringify(values),
+    });
+  }
+
   async function recordLearning(ability, xpEarned, score = 100, attempts = []) {
     const rows = await request("/rest/v1/rpc/record_learning_event", {
       method: "POST",
@@ -482,6 +489,7 @@ const Cloud = (() => {
     loadStaffDashboard,
     loadPlayerLearningData,
     setTeacherApproval,
+    updateUserAsAdmin,
     recordLearning,
     logout,
   };
