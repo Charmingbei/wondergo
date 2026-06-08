@@ -8,6 +8,66 @@ const abilities = [
   { id: "voice", name: "勇者語音競技場", shortName: "語音引擎", en: "Voice Power", icon: "◍", scene: "🎙️", color: "#f06d73", value: 48, trend: "+8%", description: "開口回應角色，啟動語音引擎" },
 ];
 
+const worldThemes = [
+  {
+    id: "colors", name: "顏色國", en: "Color Kingdom", icon: "🎨", color: "#f06d73",
+    description: "讓彩虹重新發光，學會描述身邊的顏色。",
+    words: [["🔴", "red", "紅色"], ["🔵", "blue", "藍色"], ["🟡", "yellow", "黃色"], ["🟢", "green", "綠色"], ["🟠", "orange", "橘色"], ["🟣", "purple", "紫色"], ["⚫", "black", "黑色"], ["⚪", "white", "白色"], ["🩷", "pink", "粉紅色"], ["🤎", "brown", "棕色"]],
+  },
+  {
+    id: "animals", name: "動物王國", en: "Animal Kingdom", icon: "🦁", color: "#ef9f2f",
+    description: "聽懂動物朋友的名字，完成森林觀察任務。",
+    words: [["🐶", "dog", "狗"], ["🐱", "cat", "貓"], ["🐰", "rabbit", "兔子"], ["🐦", "bird", "鳥"], ["🐟", "fish", "魚"], ["🐘", "elephant", "大象"], ["🦁", "lion", "獅子"], ["🐵", "monkey", "猴子"], ["🐼", "panda", "貓熊"], ["🐯", "tiger", "老虎"]],
+  },
+  {
+    id: "family", name: "家人島", en: "Family Island", icon: "🏡", color: "#e46f9b",
+    description: "拜訪溫暖的家人島，練習介紹自己的家人。",
+    words: [["👩", "mother", "媽媽"], ["👨", "father", "爸爸"], ["👧", "sister", "姊妹"], ["👦", "brother", "兄弟"], ["👵", "grandmother", "祖母"], ["👴", "grandfather", "祖父"], ["👶", "baby", "嬰兒"], ["👨‍👩‍👧", "family", "家人"], ["🧒", "child", "孩子"], ["👫", "parents", "父母"]],
+  },
+  {
+    id: "school", name: "校園城", en: "School City", icon: "🏫", color: "#6c4ee3",
+    description: "探索教室與校園，收集每天都會用到的單字。",
+    words: [["📘", "book", "書"], ["✏️", "pencil", "鉛筆"], ["📏", "ruler", "尺"], ["🎒", "schoolbag", "書包"], ["🪑", "chair", "椅子"], ["🖥️", "computer", "電腦"], ["🧑‍🏫", "teacher", "老師"], ["🧑‍🎓", "student", "學生"], ["📚", "library", "圖書館"], ["🏫", "classroom", "教室"]],
+  },
+  {
+    id: "food", name: "美食樂園", en: "Food Land", icon: "🍔", color: "#f08b3e",
+    description: "走進香氣滿滿的市集，用英語選出喜歡的食物。",
+    words: [["🍎", "apple", "蘋果"], ["🍌", "banana", "香蕉"], ["🍚", "rice", "米飯"], ["🍞", "bread", "麵包"], ["🥛", "milk", "牛奶"], ["🥚", "egg", "蛋"], ["🍕", "pizza", "披薩"], ["🍔", "hamburger", "漢堡"], ["🍜", "noodles", "麵"], ["🥤", "juice", "果汁"]],
+  },
+  {
+    id: "body", name: "身體星球", en: "Body Planet", icon: "🖐️", color: "#22b8ae",
+    description: "啟動健康掃描器，認識身體各部位的英文。",
+    words: [["🙂", "head", "頭"], ["👀", "eyes", "眼睛"], ["👂", "ears", "耳朵"], ["👃", "nose", "鼻子"], ["👄", "mouth", "嘴巴"], ["🖐️", "hand", "手"], ["🦶", "foot", "腳"], ["💪", "arm", "手臂"], ["🦵", "leg", "腿"], ["🦷", "teeth", "牙齒"]],
+  },
+  {
+    id: "weather", name: "天氣天空城", en: "Weather Sky", icon: "🌤️", color: "#4e8cf7",
+    description: "讀懂天空訊號，成為能預報天氣的小小觀測員。",
+    words: [["☀️", "sunny", "晴朗的"], ["🌧️", "rainy", "下雨的"], ["☁️", "cloudy", "多雲的"], ["💨", "windy", "有風的"], ["❄️", "snowy", "下雪的"], ["🥵", "hot", "炎熱的"], ["🥶", "cold", "寒冷的"], ["🌡️", "warm", "溫暖的"], ["🍃", "cool", "涼爽的"], ["🌈", "rainbow", "彩虹"]],
+  },
+  {
+    id: "home", name: "居家小鎮", en: "Home Town", icon: "🛋️", color: "#9a6ad8",
+    description: "走訪每個房間，用英語找到家中的物品與空間。",
+    words: [["🛏️", "bedroom", "臥室"], ["🍳", "kitchen", "廚房"], ["🛁", "bathroom", "浴室"], ["🛋️", "living room", "客廳"], ["🚪", "door", "門"], ["🪟", "window", "窗戶"], ["🛏️", "bed", "床"], ["🪑", "table", "桌子"], ["💡", "lamp", "燈"], ["🏠", "house", "房子"]],
+  },
+  {
+    id: "transport", name: "交通港", en: "Transport Harbor", icon: "🚂", color: "#2b9cb8",
+    description: "取得各種交通工具的通行證，準備環遊 WonderGo。",
+    words: [["🚗", "car", "汽車"], ["🚌", "bus", "公車"], ["🚲", "bike", "腳踏車"], ["🚂", "train", "火車"], ["✈️", "airplane", "飛機"], ["🚢", "ship", "船"], ["🚕", "taxi", "計程車"], ["🛵", "scooter", "機車"], ["🚇", "subway", "捷運"], ["🚶", "walk", "走路"]],
+  },
+  {
+    id: "time", name: "時間之塔", en: "Time Tower", icon: "🕰️", color: "#7368c9",
+    description: "修復時間之塔，學會數字、星期與日常時間。",
+    words: [["🌅", "morning", "早上"], ["☀️", "afternoon", "下午"], ["🌙", "evening", "傍晚"], ["🌌", "night", "夜晚"], ["📅", "Monday", "星期一"], ["🗓️", "Friday", "星期五"], ["⏰", "o'clock", "整點"], ["🕐", "one", "一"], ["🕖", "seven", "七"], ["🕛", "twelve", "十二"]],
+  },
+];
+
+const worldStages = [
+  { id: "listen", name: "聲音偵察", label: "聽", icon: "🎧", ability: "echo", description: "聽英語，找出正確單字" },
+  { id: "speak", name: "勇敢開口", label: "說", icon: "🎙️", ability: "voice", description: "選出情境句，跟著大聲說" },
+  { id: "read", name: "圖文解碼", label: "讀", icon: "📖", ability: "story", description: "看圖片與中文，辨認英文" },
+  { id: "write", name: "拼字工坊", label: "寫", icon: "✏️", ability: "spell", description: "辨認正確拼字，修復文字" },
+];
+
 const questionBanks = {
   word: {
     preA1: [
@@ -224,6 +284,7 @@ let cloudStudents = [];
 let staffDashboard = null;
 let adminAccountFilter = "all";
 let gameState = null;
+let selectedWorldCountry = null;
 
 const recoveryParams = new URLSearchParams(window.location.hash.slice(1));
 if (recoveryParams.get("type") === "recovery" && recoveryParams.get("access_token")) {
@@ -509,7 +570,7 @@ function playerHeader(user, title, subtitle) {
 function renderPlayerPage(user) {
   if (currentPage === "training") return renderTraining(user);
   if (currentPage === "ability") return renderAbility(user);
-  if (currentPage === "world") return renderComingSoon(user, "世界地圖", "第一站：晨光鎮", "完成五大能力任務，修復失落的語言之鑰。", "🗺️");
+  if (currentPage === "world") return renderWorldPage(user);
   if (currentPage === "report") return renderReport(user);
   return renderPlayerHome(user);
 }
@@ -584,6 +645,83 @@ function renderTraining(user) {
     ${playerHeader(user, "五大能力訓練館", "每座場館依照你的程度提供 10 題國小英語練習。")}
     ${renderMissions()}
     ${renderTrainingMap(user)}`;
+}
+
+function renderWorldPage(user) {
+  const country = worldThemes.find((item) => item.id === selectedWorldCountry);
+  return country ? renderWorldCountry(user, country) : renderWorldMap(user);
+}
+
+function renderWorldMap(user) {
+  return `
+    ${playerHeader(user, "WonderGo 世界航圖", "探索十個英語主題國家，收集單字並完成聽、說、讀、寫挑戰。")}
+    <section class="world-map">
+      <div class="world-map-heading">
+        <div>
+          <span class="world-kicker">TOKI'S WORLD ROUTE</span>
+          <h2>選一個國家，開始主題冒險！</h2>
+          <p>每個國家都有 10 個圖像單字與 4 座能力關卡，完成任一關卡都能獲得 XP。</p>
+        </div>
+        <img src="assets/toki.png" alt="Toki 帶領玩家探索世界地圖" />
+      </div>
+      <div class="world-ocean" aria-hidden="true">
+        <span class="world-compass">✦<small>N</small></span>
+        <span class="world-ship">⛵</span>
+        <span class="world-whale">🐋</span>
+        <span class="world-route route-one"></span>
+        <span class="world-route route-two"></span>
+      </div>
+      <div class="world-countries">
+        ${worldThemes.map((theme, index) => `
+          <button class="world-country country-${index + 1}" data-country="${theme.id}" style="--country-color:${theme.color}">
+            <span class="country-number">${String(index + 1).padStart(2, "0")}</span>
+            <span class="country-icon">${theme.icon}</span>
+            <span class="country-copy"><strong>${theme.name}</strong><small>${theme.en}</small></span>
+            <span class="country-enter">探索 →</span>
+          </button>`).join("")}
+      </div>
+    </section>`;
+}
+
+function renderWorldCountry(user, country) {
+  return `
+    ${playerHeader(user, country.name, `${country.en}｜${country.description}`)}
+    <button class="world-back" id="world-back">← 返回世界航圖</button>
+    <section class="country-hero" style="--country-color:${country.color}">
+      <div class="country-hero-icon">${country.icon}</div>
+      <div>
+        <span class="world-kicker">THEME COUNTRY</span>
+        <h2>${country.name} <small>${country.en}</small></h2>
+        <p>${country.description} 先認識圖像單字，再選擇關卡出發。</p>
+      </div>
+      <div class="country-level">適合 ${escapeHTML(user.cefrLevel || "Pre-A1")}</div>
+    </section>
+    <section class="country-section">
+      <div class="section-title">
+        <div><h2>單字探索圖鑑</h2><p>點一下卡片，可以聽到標準英語發音。</p></div>
+        <span class="word-count">10 WORDS</span>
+      </div>
+      <div class="world-word-grid">
+        ${country.words.map(([icon, english, chinese]) => `
+          <button class="world-word" data-word="${escapeHTML(english)}">
+            <span>${icon}</span><strong>${english}</strong><small>${chinese}</small><i>🔊</i>
+          </button>`).join("")}
+      </div>
+    </section>
+    <section class="country-section">
+      <div class="section-title">
+        <div><h2>聽說讀寫關卡</h2><p>每關 10 題，完成即可領取 XP；同日重複挑戰 XP 折半。</p></div>
+      </div>
+      <div class="world-stage-grid">
+        ${worldStages.map((stage, index) => `
+          <article class="world-stage stage-${stage.id}">
+            <span class="stage-order">0${index + 1}</span>
+            <div class="stage-icon">${stage.icon}</div>
+            <div><span>${stage.label}力關卡</span><h3>${stage.name}</h3><p>${stage.description}</p></div>
+            <button class="primary-btn world-stage-start" data-country="${country.id}" data-stage="${stage.id}">開始挑戰</button>
+          </article>`).join("")}
+      </div>
+    </section>`;
 }
 
 function radarSVG(values = abilities) {
@@ -1069,6 +1207,94 @@ function vocabularyFor(question) {
     .join(" ");
 }
 
+function worldSentence(theme, english) {
+  const article = /^[aeiou]/i.test(english) ? "an" : "a";
+  const pluralBodyWords = new Set(["eyes", "ears", "teeth"]);
+  const templates = {
+    colors: `It is ${english}.`,
+    animals: `I see ${article} ${english}.`,
+    family: english === "parents" ? "These are my parents." : `This is my ${english}.`,
+    school: `I see ${article} ${english}.`,
+    food: `I like ${english}.`,
+    body: pluralBodyWords.has(english) ? `These are my ${english}.` : `This is my ${english}.`,
+    weather: english === "rainbow" ? "I see a rainbow." : `It is ${english}.`,
+    home: `This is the ${english}.`,
+    transport: english === "walk" ? "I walk to school." : `I go by ${english}.`,
+    time: `It is ${english}.`,
+  };
+  return templates[theme.id];
+}
+
+function misspellings(word, fallbackWords) {
+  const plain = word.toLowerCase();
+  const compact = plain.replaceAll(" ", "");
+  const choices = [
+    compact.length > 3 ? `${compact.slice(0, 1)}${compact.slice(2, 3)}${compact.slice(1, 2)}${compact.slice(3)}` : `${compact}e`,
+    compact.length > 3 ? compact.slice(0, -1) : `${compact}${compact.slice(-1)}`,
+    compact.length > 4 ? `${compact.slice(0, 2)}${compact.slice(3)}` : `${compact.slice(0, 1)}a${compact.slice(1)}`,
+    ...fallbackWords.map((item) => item[1]),
+  ];
+  return [...new Set([word, ...choices].filter((item) => item !== word))].slice(0, 4);
+}
+
+function worldStageQuestions(user, theme, stage) {
+  const seed = `${getDailyKey()}:${user.account}:${user.cefrLevel}:${theme.id}:${stage.id}`;
+  const orderedWords = seededShuffle(theme.words, seed);
+  return orderedWords.map((word, index) => {
+    const [icon, english, chinese] = word;
+    const distractors = seededShuffle(
+      theme.words.filter((item) => item[1] !== english),
+      `${seed}:distractors:${index}`,
+    ).slice(0, 3);
+    let question;
+    if (stage.id === "listen") {
+      question = [icon, "聽一聽，選出你聽到的單字。", [english, ...distractors.map((item) => item[1])], 0, english];
+    } else if (stage.id === "speak") {
+      const sentence = worldSentence(theme, english);
+      question = [
+        icon,
+        `看圖選出正確句子，再跟著大聲說。`,
+        [sentence, ...distractors.map((item) => worldSentence(theme, item[1]))],
+        0,
+        sentence,
+      ];
+    } else if (stage.id === "write") {
+      question = [icon, `選出「${chinese}」的正確拼字。`, misspellings(english, distractors), 0];
+    } else {
+      question = [icon, `圖片是「${chinese}」，英文怎麼說？`, [english, ...distractors.map((item) => item[1])], 0];
+    }
+    return shuffleQuestionOptions(question, `${seed}:${index}`);
+  });
+}
+
+function startWorldStage(countryId, stageId) {
+  const user = currentUser();
+  const theme = worldThemes.find((item) => item.id === countryId);
+  const stage = worldStages.find((item) => item.id === stageId);
+  if (!theme || !stage) return;
+  const abilityInfo = abilities.find((item) => item.id === stage.ability);
+  gameState = {
+    mode: "world",
+    id: `${countryId}:${stageId}`,
+    ability: stage.ability,
+    title: `${theme.name}・${stage.name}`,
+    color: theme.color,
+    taskKey: `ability:${countryId}${stageId}`,
+    questions: worldStageQuestions(user, theme, stage),
+    index: 0,
+    correct: 0,
+    answered: false,
+    selected: null,
+    synced: false,
+    attempts: [],
+    returnPage: "world",
+    returnCountry: countryId,
+    abilityName: abilityInfo.shortName,
+  };
+  document.body.insertAdjacentHTML("beforeend", renderGameModal());
+  bindGameModalEvents();
+}
+
 function startGame(mode, id) {
   const user = currentUser();
   const isMission = mode === "mission";
@@ -1096,6 +1322,7 @@ function startGame(mode, id) {
     selected: null,
     synced: false,
     attempts: [],
+    returnPage: "home",
   };
   document.body.insertAdjacentHTML("beforeend", renderGameModal());
   bindGameModalEvents();
@@ -1225,7 +1452,8 @@ async function claimGameResult() {
       String(getLocalDailyTaskCount(user, gameState.taskKey) + 1),
     );
     saveData();
-    currentPage = "home";
+    currentPage = gameState.returnPage || "home";
+    selectedWorldCountry = gameState.returnCountry || null;
     document.getElementById("game-modal")?.remove();
     render();
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -1469,6 +1697,7 @@ function bindEvents() {
 
   document.querySelectorAll("[data-page]").forEach((button) => button.addEventListener("click", () => {
     currentPage = button.dataset.page;
+    selectedWorldCountry = null;
     render();
     window.scrollTo({ top: 0, behavior: "smooth" });
   }));
@@ -1487,6 +1716,26 @@ function bindEvents() {
 
   document.querySelectorAll(".mission-game").forEach((button) => button.addEventListener("click", () => {
     startGame("mission", button.dataset.mission);
+  }));
+
+  document.querySelectorAll(".world-country").forEach((button) => button.addEventListener("click", () => {
+    selectedWorldCountry = button.dataset.country;
+    render();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }));
+
+  document.getElementById("world-back")?.addEventListener("click", () => {
+    selectedWorldCountry = null;
+    render();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+
+  document.querySelectorAll(".world-word").forEach((button) => button.addEventListener("click", () => {
+    speakEnglish(button.dataset.word);
+  }));
+
+  document.querySelectorAll(".world-stage-start").forEach((button) => button.addEventListener("click", () => {
+    startWorldStage(button.dataset.country, button.dataset.stage);
   }));
 
   document.querySelectorAll(".student-row").forEach((row) => row.addEventListener("click", () => {
