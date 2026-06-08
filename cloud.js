@@ -421,6 +421,131 @@ const Cloud = (() => {
     });
   }
 
+  async function loadTeacherContent() {
+    const [materials, assignments, completions] = await Promise.all([
+      request("/rest/v1/learning_materials?select=*&order=updated_at.desc"),
+      request("/rest/v1/learning_assignments?select=*&order=created_at.desc"),
+      request("/rest/v1/assignment_completions?select=*&order=completed_at.desc"),
+    ]);
+    return {
+      materials: materials.map(mapMaterial),
+      assignments: assignments.map((assignment) => ({
+        ...mapAssignment(assignment),
+        completions: completions
+          .filter((item) => item.assignment_id === assignment.id)
+          .map(mapCompletion),
+      })),
+    };
+  }
+
+  async function saveMaterial(values) {
+    const session = getSession();
+    const payload = {
+      teacher_id: session.user.id,
+      title: values.title,
+      description: values.description || "",
+      ability: values.ability,
+      cefr_level: values.cefrLevel,
+      questions: values.questions,
+      status: values.status,
+      updated_at: new Date().toISOString(),
+    };
+    const path = values.id
+      ? `/rest/v1/learning_materials?id=eq.${values.id}`
+      : "/rest/v1/learning_materials";
+    const rows = await request(path, {
+      method: values.id ? "PATCH" : "POST",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify(payload),
+    });
+    return mapMaterial(rows[0]);
+  }
+
+  async function archiveMaterial(materialId) {
+    const rows = await request(`/rest/v1/learning_materials?id=eq.${materialId}`, {
+      method: "PATCH",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify({
+        status: "archived",
+        updated_at: new Date().toISOString(),
+      }),
+    });
+    return mapMaterial(rows[0]);
+  }
+
+  async function createAssignment(values) {
+    const session = getSession();
+    const rows = await request("/rest/v1/learning_assignments", {
+      method: "POST",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify({
+        teacher_id: session.user.id,
+        material_id: values.materialId,
+        student_id: values.studentId || null,
+        school: values.school,
+        class_name: values.className,
+        title: values.title,
+        instructions: values.instructions || "",
+        due_at: values.dueAt || null,
+        xp_reward: Number(values.xpReward),
+      }),
+    });
+    return mapAssignment(rows[0]);
+  }
+
+  async function deleteAssignment(assignmentId) {
+    await request(`/rest/v1/learning_assignments?id=eq.${assignmentId}`, {
+      method: "DELETE",
+      headers: { Prefer: "return=minimal" },
+    });
+  }
+
+  async function loadPlayerAssignments() {
+    const session = getSession();
+    if (!session?.user?.id) return [];
+    const [assignments, materials, completions] = await Promise.all([
+      request("/rest/v1/learning_assignments?select=*&order=created_at.desc"),
+      request("/rest/v1/learning_materials?status=eq.published&select=*"),
+      request(`/rest/v1/assignment_completions?student_id=eq.${session.user.id}&select=*`),
+    ]);
+    const materialsById = new Map(materials.map((item) => [item.id, mapMaterial(item)]));
+    const completionByAssignment = new Map(
+      completions.map((item) => [item.assignment_id, mapCompletion(item)]),
+    );
+    return assignments
+      .map((assignment) => ({
+        ...mapAssignment(assignment),
+        material: materialsById.get(assignment.material_id),
+        completion: completionByAssignment.get(assignment.id) || null,
+      }))
+      .filter((assignment) => assignment.material);
+  }
+
+  async function completeAssignment(assignmentId, score, attempts = []) {
+    const result = await request("/rest/v1/rpc/complete_learning_assignment", {
+      method: "POST",
+      body: JSON.stringify({
+        p_assignment_id: assignmentId,
+        p_score: score,
+      }),
+    });
+    if (attempts.length) {
+      try {
+        await request("/rest/v1/rpc/record_question_attempts", {
+          method: "POST",
+          body: JSON.stringify({ p_attempts: attempts }),
+        });
+      } catch (error) {
+        console.warn("Assignment analytics sync failed", error);
+      }
+    }
+    return {
+      ...result.profile,
+      awardedXp: result.awarded_xp,
+      ...(await loadPlayerLearningData()),
+    };
+  }
+
   async function recordLearning(taskKey, ability, baseXp, score = 100, attempts = []) {
     const result = await request("/rest/v1/rpc/record_task_completion", {
       method: "POST",
@@ -484,6 +609,47 @@ const Cloud = (() => {
     };
   }
 
+  function mapMaterial(material) {
+    return {
+      id: material.id,
+      teacherId: material.teacher_id,
+      title: material.title,
+      description: material.description,
+      ability: material.ability,
+      cefrLevel: material.cefr_level,
+      questions: material.questions || [],
+      status: material.status,
+      createdAt: material.created_at,
+      updatedAt: material.updated_at,
+    };
+  }
+
+  function mapAssignment(assignment) {
+    return {
+      id: assignment.id,
+      teacherId: assignment.teacher_id,
+      materialId: assignment.material_id,
+      studentId: assignment.student_id,
+      school: assignment.school,
+      className: assignment.class_name,
+      title: assignment.title,
+      instructions: assignment.instructions,
+      dueAt: assignment.due_at,
+      xpReward: assignment.xp_reward,
+      createdAt: assignment.created_at,
+    };
+  }
+
+  function mapCompletion(completion) {
+    return {
+      assignmentId: completion.assignment_id,
+      studentId: completion.student_id,
+      score: Number(completion.score),
+      xpEarned: completion.xp_earned,
+      completedAt: completion.completed_at,
+    };
+  }
+
   return {
     isConfigured,
     register,
@@ -496,6 +662,13 @@ const Cloud = (() => {
     loadPlayerLearningData,
     setTeacherApproval,
     updateUserAsAdmin,
+    loadTeacherContent,
+    saveMaterial,
+    archiveMaterial,
+    createAssignment,
+    deleteAssignment,
+    loadPlayerAssignments,
+    completeAssignment,
     recordLearning,
     logout,
   };

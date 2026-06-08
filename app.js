@@ -285,6 +285,8 @@ let staffDashboard = null;
 let adminAccountFilter = "all";
 let gameState = null;
 let selectedWorldCountry = null;
+let teacherContent = { materials: [], assignments: [] };
+let playerAssignments = [];
 
 const recoveryParams = new URLSearchParams(window.location.hash.slice(1));
 if (recoveryParams.get("type") === "recovery" && recoveryParams.get("access_token")) {
@@ -341,7 +343,12 @@ function playerAbilities(user = currentUser()) {
 async function refreshPlayerLearning(user) {
   if (!user?.cloud || user.role !== "player") return;
   try {
-    Object.assign(user, await Cloud.loadPlayerLearningData());
+    const [learning, assignments] = await Promise.all([
+      Cloud.loadPlayerLearningData(),
+      Cloud.loadPlayerAssignments(),
+    ]);
+    Object.assign(user, learning);
+    playerAssignments = assignments;
     saveData();
   } catch (error) {
     toast(`能力資料同步失敗：${error.message}`);
@@ -355,11 +362,24 @@ function activeStudents() {
 async function refreshTeacherStudents(user) {
   if (!user?.cloud || !isStaffRole(user.role)) return;
   try {
-    staffDashboard = await Cloud.loadStaffDashboard();
+    const [dashboard, content] = await Promise.all([
+      Cloud.loadStaffDashboard(),
+      user.role === "teacher"
+        ? Cloud.loadTeacherContent()
+        : Promise.resolve({ materials: [], assignments: [] }),
+    ]);
+    staffDashboard = dashboard;
     cloudStudents = staffDashboard.students;
+    teacherContent = content;
   } catch (error) {
     toast(`學生資料同步失敗：${error.message}`);
   }
+}
+
+async function refreshUserCloudData(user) {
+  return isStaffRole(user?.role)
+    ? refreshTeacherStudents(user)
+    : refreshPlayerLearning(user);
 }
 
 function escapeHTML(value = "") {
@@ -578,8 +598,44 @@ function renderPlayerPage(user) {
 function renderPlayerHome(user) {
   return `
     ${playerHeader(user, `嗨，${escapeHTML(user.account)}！`, "今天也和 Toki 一起前進一點吧。")}
+    ${renderPlayerAssignments()}
     ${renderMissions()}
     ${renderTrainingMap(user)}`;
+}
+
+function renderPlayerAssignments() {
+  if (!playerAssignments.length) return "";
+  const pending = playerAssignments.filter((item) => !item.completion);
+  const completed = playerAssignments.filter((item) => item.completion);
+  return `
+    <section class="assigned-quest-panel">
+      <div class="section-title">
+        <div><span class="quest-eyebrow">TEACHER QUEST</span><h2>老師指派任務</h2><p>${pending.length ? `還有 ${pending.length} 項任務等待完成。` : "本次指派任務都完成了！"}</p></div>
+        <span class="quest-reward">${completed.length}／${playerAssignments.length} 已完成</span>
+      </div>
+      <div class="assigned-quest-grid">
+        ${playerAssignments.map((assignment) => {
+          const material = assignment.material;
+          const ability = abilities.find((item) => item.id === material.ability);
+          const due = assignment.dueAt
+            ? new Date(assignment.dueAt).toLocaleDateString("zh-TW")
+            : "無期限";
+          return `
+            <article class="assigned-quest ${assignment.completion ? "completed" : ""}" style="--assignment-color:${ability.color}">
+              <span class="assigned-icon">${ability.scene}</span>
+              <div>
+                <span class="mission-tag">${escapeHTML(material.cefrLevel)}・${ability.shortName}</span>
+                <h3>${escapeHTML(assignment.title)}</h3>
+                <p>${escapeHTML(assignment.instructions || material.description || "完成老師準備的英語挑戰。")}</p>
+                <small>截止：${due}・獎勵 ${assignment.xpReward} XP</small>
+              </div>
+              ${assignment.completion
+                ? `<span class="assignment-done">✓ 已完成 ${Math.round(assignment.completion.score)} 分</span>`
+                : `<button class="primary-btn assigned-game" data-assignment="${assignment.id}">開始任務</button>`}
+            </article>`;
+        }).join("")}
+      </div>
+    </section>`;
 }
 
 function renderTrainingMap(user) {
@@ -862,10 +918,169 @@ function teacherHeader(user, title, subtitle) {
 function renderTeacherPage(user) {
   if (user.role === "admin") return renderAdminPage(user);
   if (currentPage === "students") return renderStudents(user);
-  if (currentPage === "missions") return renderTeacherPlaceholder(user, "指派任務", "為全班或個別學生安排主線、補強與極限挑戰。", "✓");
-  if (currentPage === "content") return renderTeacherPlaceholder(user, "教材管理", "建立世界、章節、關卡、題目、提示與獎勵。", "◇");
+  if (currentPage === "missions") return renderAssignmentManager(user);
+  if (currentPage === "content") return renderMaterialManager(user);
   if (currentPage === "analytics") return renderTeacherPlaceholder(user, "教學成效", "追蹤答錯率、完成率與教材調整前後的學習變化。", "⌁");
   return renderTeacherOverview(user);
+}
+
+function materialStatusLabel(status) {
+  return { draft: "草稿", published: "已發布", archived: "已封存" }[status] || status;
+}
+
+function renderMaterialManager(user) {
+  const materials = teacherContent.materials || [];
+  const published = materials.filter((item) => item.status === "published").length;
+  return `
+    ${teacherHeader(user, "教材管理", "建立題組、設定程度與五大能力分類")}
+    <section class="metric-grid">
+      <article class="card metric"><span>教材總數</span><strong>${materials.length} 份</strong><small>包含草稿與封存教材</small></article>
+      <article class="card metric"><span>已發布</span><strong>${published} 份</strong><small>可立即指派給學生</small></article>
+      <article class="card metric"><span>題目總數</span><strong>${materials.reduce((sum, item) => sum + item.questions.length, 0)} 題</strong><small>結構化題目與答案</small></article>
+    </section>
+    <div class="section-title material-heading">
+      <div><h2>我的教材庫</h2><p>先建立並發布教材，再前往「指派任務」選擇對象。</p></div>
+      <button class="primary-btn open-material-editor">＋ 建立教材</button>
+    </div>
+    ${materials.length ? `
+      <section class="material-grid">
+        ${materials.map((material) => {
+          const ability = abilities.find((item) => item.id === material.ability);
+          return `
+            <article class="card material-card ${material.status}" style="--material-color:${ability.color}">
+              <header><span class="material-icon">${ability.scene}</span><span class="status material-status">${materialStatusLabel(material.status)}</span></header>
+              <span class="mission-tag">${escapeHTML(material.cefrLevel)}・${ability.shortName}</span>
+              <h3>${escapeHTML(material.title)}</h3>
+              <p>${escapeHTML(material.description || "尚未填寫教材說明")}</p>
+              <div class="material-meta"><span>${material.questions.length} 題</span><span>更新 ${new Date(material.updatedAt).toLocaleDateString("zh-TW")}</span></div>
+              <footer>
+                <button class="secondary-btn edit-material" data-material="${material.id}">編輯教材</button>
+                ${material.status !== "archived" ? `<button class="ghost-btn archive-material" data-material="${material.id}">封存</button>` : ""}
+              </footer>
+            </article>`;
+        }).join("")}
+      </section>
+    ` : `
+      <section class="card empty-page"><div><div class="big-icon">◇</div><h2>建立第一份教材</h2><p style="color:var(--muted)">輸入題目、答案與選項，發布後即可指派給學生。</p><button class="primary-btn open-material-editor">建立教材</button></div></section>
+    `}`;
+}
+
+function questionsToText(questions = []) {
+  return questions.map((question) => [
+    question.visual || "📝",
+    question.prompt,
+    question.options?.[question.answer] || "",
+    ...question.options.filter((_, index) => index !== question.answer).slice(0, 3),
+    question.speech || "",
+  ].join(" | ")).join("\n");
+}
+
+function parseMaterialQuestions(text) {
+  const lines = text.split("\n").map((line) => line.trim()).filter(Boolean);
+  if (!lines.length) throw new Error("請至少輸入一題教材題目。");
+  if (lines.length > 20) throw new Error("每份教材最多 20 題。");
+  return lines.map((line, index) => {
+    const parts = line.split("|").map((part) => part.trim());
+    if (parts.length < 6 || parts.slice(1, 6).some((part) => !part)) {
+      throw new Error(`第 ${index + 1} 題格式不完整，請確認題目與四個答案選項。`);
+    }
+    return {
+      visual: parts[0] || "📝",
+      prompt: parts[1],
+      options: [parts[2], parts[3], parts[4], parts[5]],
+      answer: 0,
+      speech: parts[6] || "",
+    };
+  });
+}
+
+function renderMaterialEditor(material = null) {
+  const sample = [
+    "🍎 | 哪一個單字是「蘋果」？ | apple | banana | orange | grape | apple",
+    "🐶 | 聽一聽，選出正確單字。 | dog | cat | bird | fish | dog",
+  ].join("\n");
+  return `
+    <div class="game-modal admin-edit-modal" id="material-editor-modal">
+      <article class="game-card admin-edit-card material-editor-card">
+        <header>
+          <div><span class="mission-tag">教材編輯器</span><h2>${material ? "編輯教材" : "建立新教材"}</h2></div>
+          <button class="ghost-btn close-material-editor" type="button">✕</button>
+        </header>
+        <form id="material-form">
+          <input type="hidden" name="id" value="${material?.id || ""}" />
+          <div class="form-grid">
+            <div class="field full"><label>教材名稱</label><input name="title" maxlength="100" value="${escapeHTML(material?.title || "")}" placeholder="例：食物單字大挑戰" required /></div>
+            <div class="field full"><label>教材說明</label><textarea name="description" rows="2" placeholder="說明本教材的學習目標">${escapeHTML(material?.description || "")}</textarea></div>
+            <div class="field"><label>五大能力</label><select name="ability">${abilities.map((ability) => `<option value="${ability.id}" ${material?.ability === ability.id ? "selected" : ""}>${ability.shortName}</option>`).join("")}</select></div>
+            <div class="field"><label>適用程度</label><select name="cefrLevel">${["Pre-A1", "A1", "A2", "B1", "B2"].map((level) => `<option ${material?.cefrLevel === level ? "selected" : ""}>${level}</option>`).join("")}</select></div>
+            <div class="field full"><label>發布狀態</label><select name="status"><option value="draft" ${material?.status === "draft" ? "selected" : ""}>草稿</option><option value="published" ${material?.status === "published" ? "selected" : ""}>發布，可供指派</option><option value="archived" ${material?.status === "archived" ? "selected" : ""}>封存</option></select></div>
+            <div class="field full">
+              <label>教材題目</label>
+              <textarea class="question-source" name="questions" rows="10" placeholder="${escapeHTML(sample)}" required>${escapeHTML(questionsToText(material?.questions))}</textarea>
+              <small class="field-help">每行一題：圖片｜題目｜正確答案｜錯誤選項1｜錯誤選項2｜錯誤選項3｜播放語音（選填）</small>
+            </div>
+          </div>
+          <div class="editor-actions"><button class="ghost-btn close-material-editor" type="button">取消</button><button class="primary-btn" id="save-material" type="submit">儲存教材</button></div>
+        </form>
+      </article>
+    </div>`;
+}
+
+function renderAssignmentManager(user) {
+  const materials = teacherContent.materials.filter((item) => item.status === "published");
+  const assignments = teacherContent.assignments || [];
+  return `
+    ${teacherHeader(user, "指派任務", "將已發布教材指派給全班或個別學生")}
+    <section class="metric-grid">
+      <article class="card metric"><span>已指派任務</span><strong>${assignments.length} 項</strong><small>目前班級的任務紀錄</small></article>
+      <article class="card metric"><span>可用教材</span><strong>${materials.length} 份</strong><small>已發布教材</small></article>
+      <article class="card metric"><span>完成紀錄</span><strong>${assignments.reduce((sum, item) => sum + item.completions.length, 0)} 人次</strong><small>學生已完成的任務</small></article>
+    </section>
+    <div class="section-title material-heading">
+      <div><h2>班級任務</h2><p>可指派全班，或針對需要補強的學生單獨安排。</p></div>
+      <button class="primary-btn open-assignment-editor" ${materials.length ? "" : "disabled"}>＋ 指派任務</button>
+    </div>
+    ${materials.length ? "" : '<div class="insight focus"><span>!</span><div><b>請先發布教材</b><p>前往教材管理建立題組，狀態設為「發布」後即可指派。</p></div></div>'}
+    <section class="assignment-list">
+      ${assignments.length ? assignments.map((assignment) => {
+        const material = teacherContent.materials.find((item) => item.id === assignment.materialId);
+        const target = assignment.studentId
+          ? cloudStudents.find((student) => student.id === assignment.studentId)?.name || "個別學生"
+          : "全班";
+        return `
+          <article class="card assignment-row">
+            <div class="assignment-main">
+              <span class="assigned-icon">${abilities.find((item) => item.id === material?.ability)?.scene || "📝"}</span>
+              <div><span class="mission-tag">${escapeHTML(target)}</span><h3>${escapeHTML(assignment.title)}</h3><p>${escapeHTML(material?.title || "教材")}・${assignment.xpReward} XP${assignment.dueAt ? `・截止 ${new Date(assignment.dueAt).toLocaleDateString("zh-TW")}` : ""}</p></div>
+            </div>
+            <div class="assignment-progress"><strong>${assignment.completions.length}</strong><span>人完成</span></div>
+            <button class="ghost-btn delete-assignment" data-assignment="${assignment.id}">刪除</button>
+          </article>`;
+      }).join("") : '<section class="card empty-page"><div><div class="big-icon">✓</div><h2>尚未指派任務</h2><p style="color:var(--muted)">選擇已發布教材，安排給全班或個別學生。</p></div></section>'}
+    </section>`;
+}
+
+function renderAssignmentEditor(user, targetStudentId = "") {
+  const materials = teacherContent.materials.filter((item) => item.status === "published");
+  return `
+    <div class="game-modal admin-edit-modal" id="assignment-editor-modal">
+      <article class="game-card admin-edit-card">
+        <header><div><span class="mission-tag">任務指派器</span><h2>建立班級任務</h2></div><button class="ghost-btn close-assignment-editor" type="button">✕</button></header>
+        <form id="assignment-form">
+          <div class="form-grid">
+            <div class="field full"><label>選擇教材</label><select name="materialId" id="assignment-material" required>${materials.map((item) => `<option value="${item.id}">${escapeHTML(item.title)}（${item.cefrLevel}・${item.questions.length} 題）</option>`).join("")}</select></div>
+            <div class="field full"><label>任務名稱</label><input name="title" maxlength="120" value="${escapeHTML(materials[0]?.title || "")}" required /></div>
+            <div class="field full"><label>指派對象</label><select name="studentId"><option value="">全班學生</option>${cloudStudents.map((student) => `<option value="${student.id}" ${student.id === targetStudentId ? "selected" : ""}>${escapeHTML(student.name)}（${escapeHTML(student.seat)}號）</option>`).join("")}</select></div>
+            <div class="field"><label>截止日期</label><input name="dueAt" type="date" /></div>
+            <div class="field"><label>完成獎勵 XP</label><input name="xpReward" type="number" min="10" max="200" value="50" required /></div>
+            <div class="field full"><label>任務說明</label><textarea name="instructions" rows="3" placeholder="例：完成後請複習答錯的單字。"></textarea></div>
+          </div>
+          <input type="hidden" name="school" value="${escapeHTML(user.school)}" />
+          <input type="hidden" name="className" value="${escapeHTML(user.className)}" />
+          <div class="editor-actions"><button class="ghost-btn close-assignment-editor" type="button">取消</button><button class="primary-btn" id="save-assignment" type="submit">送出指派</button></div>
+        </form>
+      </article>
+    </div>`;
 }
 
 function renderAdminPage(user) {
@@ -1091,7 +1306,7 @@ function renderStudents(user) {
         <div class="detail-stat"><label><span>本週任務完成率</span><b>${s.completion}%</b></label><div class="bar"><span style="width:${s.completion}%"></span></div></div>
         ${abilities.map((a, i) => `<div class="detail-stat"><label><span>${a.shortName}</span><b>${studentAbilities[i]}</b></label><div class="bar"><span style="width:${studentAbilities[i]}%;background:${a.color}"></span></div></div>`).join("")}
         <div class="insight ${s.status.includes("關注") ? "focus" : "good"}"><span>✦</span><div><b>系統建議</b><p>${s.status.includes("關注") ? `優先安排「${s.focus}」，以 5 分鐘短任務協助恢復節奏。` : `學習節奏穩定，可安排「${s.focus}」延伸任務。`}</p></div></div>
-        <button class="primary-btn mission-action">為 ${s.name.slice(1)} 指派任務</button>
+        <button class="primary-btn mission-action" data-target-student="${s.id || ""}">為 ${s.name.slice(1)} 指派任務</button>
       </article>
     </section>`;
 }
@@ -1159,6 +1374,15 @@ function seededShuffle(items, seedText) {
 }
 
 function normalizeQuestion(question) {
+  if (!Array.isArray(question)) {
+    return {
+      visual: question.visual || "📝",
+      prompt: question.prompt,
+      options: question.options,
+      answer: Number(question.answer) || 0,
+      speech: question.speech || "",
+    };
+  }
   return {
     visual: question[0],
     prompt: question[1],
@@ -1288,6 +1512,36 @@ function startWorldStage(countryId, stageId) {
   bindGameModalEvents();
 }
 
+function startAssignedGame(assignmentId) {
+  const assignment = playerAssignments.find((item) => item.id === assignmentId);
+  if (!assignment || assignment.completion) return;
+  const material = assignment.material;
+  const abilityInfo = abilities.find((item) => item.id === material.ability);
+  const seed = `${getDailyKey()}:${currentUser().account}:assignment:${assignment.id}`;
+  const questions = seededShuffle(material.questions, seed)
+    .map((question, index) => shuffleQuestionOptions(question, `${seed}:${index}`));
+  gameState = {
+    mode: "assignment",
+    id: assignment.id,
+    assignmentId: assignment.id,
+    ability: material.ability,
+    title: assignment.title,
+    color: abilityInfo.color,
+    taskKey: `assignment:${assignment.id}`,
+    questions,
+    index: 0,
+    correct: 0,
+    answered: false,
+    selected: null,
+    synced: false,
+    attempts: [],
+    baseXp: assignment.xpReward,
+    returnPage: "home",
+  };
+  document.body.insertAdjacentHTML("beforeend", renderGameModal());
+  bindGameModalEvents();
+}
+
 function startGame(mode, id) {
   const user = currentUser();
   const isMission = mode === "mission";
@@ -1327,18 +1581,19 @@ function renderGameModal() {
 
 function renderGameCard() {
   if (gameState.index >= gameState.questions.length) {
-    const baseXp = 20 + gameState.correct * 5;
+    const isAssignment = gameState.mode === "assignment";
+    const baseXp = isAssignment ? gameState.baseXp : 20 + gameState.correct * 5;
     const user = currentUser();
-    const completionCount = getLocalDailyTaskCount(user, gameState.taskKey);
-    const expectedXp = calculateAwardedXp(baseXp, completionCount);
+    const completionCount = isAssignment ? 0 : getLocalDailyTaskCount(user, gameState.taskKey);
+    const expectedXp = isAssignment ? baseXp : calculateAwardedXp(baseXp, completionCount);
     return `
       <article class="game-card result-card">
         <div class="result-burst">🏆</div>
         <span class="mission-tag">訓練完成</span>
         <h2>${gameState.title}過關！</h2>
-        <p>你完成了 10 題練習，答對 <strong>${gameState.correct}</strong> 題。</p>
+        <p>你完成了 ${gameState.questions.length} 題練習，答對 <strong>${gameState.correct}</strong> 題。</p>
         <div class="result-xp">＋${expectedXp} XP</div>
-        ${completionCount >= 1 ? '<p class="repeat-xp-note">今日重複挑戰：本次經驗值折半</p>' : ""}
+        ${!isAssignment && completionCount >= 1 ? '<p class="repeat-xp-note">今日重複挑戰：本次經驗值折半</p>' : ""}
         <button class="primary-btn wide" id="claim-result">領取經驗值</button>
       </article>`;
   }
@@ -1349,7 +1604,7 @@ function renderGameCard() {
   return `
     <article class="game-card" style="--game-color:${gameState.color}">
       <header>
-        <div><span class="mission-tag">${gameState.title}</span><small>第 ${gameState.index + 1}／10 題</small></div>
+        <div><span class="mission-tag">${gameState.title}</span><small>第 ${gameState.index + 1}／${gameState.questions.length} 題</small></div>
         <button class="ghost-btn" id="close-game" aria-label="離開題目">✕</button>
       </header>
       <div class="game-progress"><span style="width:${progress}%;background:${gameState.color}"></span></div>
@@ -1369,7 +1624,7 @@ function renderGameCard() {
           <b>${gameState.selected === question.answer ? "答對了！" : "再記一次就會了！"}</b>
           <span>正確答案：${question.options[question.answer]}</span>
         </div>
-        <button class="primary-btn wide" id="next-question">${gameState.index === 9 ? "查看訓練成果" : "下一題"}</button>
+        <button class="primary-btn wide" id="next-question">${gameState.index === gameState.questions.length - 1 ? "查看訓練成果" : "下一題"}</button>
       ` : ""}
     </article>`;
 }
@@ -1409,12 +1664,25 @@ async function claimGameResult() {
     claimButton.textContent = "經驗值領取中...";
   }
   const user = currentUser();
-  const baseXp = 20 + gameState.correct * 5;
-  const score = gameState.correct * 10;
+  const isAssignment = gameState.mode === "assignment";
+  const baseXp = isAssignment ? gameState.baseXp : 20 + gameState.correct * 5;
+  const score = Math.round((gameState.correct / gameState.questions.length) * 100);
 
   try {
     let awardedXp = baseXp;
-    if (user.cloud) {
+    if (isAssignment && user.cloud) {
+      const updated = await Cloud.completeAssignment(
+        gameState.assignmentId,
+        score,
+        gameState.attempts,
+      );
+      user.xp = updated.xp;
+      awardedXp = updated.awardedXp;
+      user.abilityValues = updated.abilityValues;
+      user.abilityTrends = updated.abilityTrends;
+      user.weeklySummary = updated.weeklySummary;
+      playerAssignments = await Cloud.loadPlayerAssignments();
+    } else if (user.cloud) {
       const updated = await Cloud.recordLearning(
         gameState.taskKey,
         gameState.ability,
@@ -1440,17 +1708,19 @@ async function claimGameResult() {
       user.abilityTrends[gameState.ability] =
         (user.abilityTrends[gameState.ability] || 0) + 1;
     }
-    localStorage.setItem(
-      dailyTaskStorageKey(user, gameState.taskKey),
-      String(getLocalDailyTaskCount(user, gameState.taskKey) + 1),
-    );
+    if (!isAssignment) {
+      localStorage.setItem(
+        dailyTaskStorageKey(user, gameState.taskKey),
+        String(getLocalDailyTaskCount(user, gameState.taskKey) + 1),
+      );
+    }
     saveData();
     currentPage = gameState.returnPage || "home";
     selectedWorldCountry = gameState.returnCountry || null;
     document.getElementById("game-modal")?.remove();
     render();
     window.scrollTo({ top: 0, behavior: "smooth" });
-    toast(`訓練完成！獲得 ${awardedXp} XP${awardedXp < baseXp ? "（今日重複挑戰折半）" : ""}`);
+    toast(`訓練完成！獲得 ${awardedXp} XP${!isAssignment && awardedXp < baseXp ? "（今日重複挑戰折半）" : ""}`);
   } catch {
     gameState.synced = false;
     if (claimButton) {
@@ -1496,6 +1766,93 @@ function bindGameModalEvents() {
     refreshGameModal();
   });
   document.getElementById("claim-result")?.addEventListener("click", claimGameResult);
+}
+
+function closeMaterialEditor() {
+  document.getElementById("material-editor-modal")?.remove();
+}
+
+function bindMaterialEditorEvents() {
+  document.querySelectorAll(".close-material-editor").forEach((button) => {
+    button.addEventListener("click", closeMaterialEditor);
+  });
+  document.getElementById("material-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const button = document.getElementById("save-material");
+    let questions;
+    try {
+      questions = parseMaterialQuestions(form.get("questions"));
+    } catch (error) {
+      return toast(error.message);
+    }
+    button.disabled = true;
+    button.textContent = "教材儲存中...";
+    try {
+      await Cloud.saveMaterial({
+        id: form.get("id") || "",
+        title: form.get("title").trim(),
+        description: form.get("description").trim(),
+        ability: form.get("ability"),
+        cefrLevel: form.get("cefrLevel"),
+        status: form.get("status"),
+        questions,
+      });
+      await refreshTeacherStudents(currentUser());
+      closeMaterialEditor();
+      render();
+      toast("教材已儲存。");
+    } catch (error) {
+      button.disabled = false;
+      button.textContent = "重新儲存";
+      toast(`教材儲存失敗：${error.message}`);
+    }
+  });
+}
+
+function closeAssignmentEditor() {
+  document.getElementById("assignment-editor-modal")?.remove();
+}
+
+function bindAssignmentEditorEvents() {
+  document.querySelectorAll(".close-assignment-editor").forEach((button) => {
+    button.addEventListener("click", closeAssignmentEditor);
+  });
+  const materialSelect = document.getElementById("assignment-material");
+  materialSelect?.addEventListener("change", () => {
+    const material = teacherContent.materials.find((item) => item.id === materialSelect.value);
+    const titleInput = document.querySelector('#assignment-form [name="title"]');
+    if (material && titleInput) titleInput.value = material.title;
+  });
+  document.getElementById("assignment-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const button = document.getElementById("save-assignment");
+    button.disabled = true;
+    button.textContent = "任務指派中...";
+    try {
+      await Cloud.createAssignment({
+        materialId: form.get("materialId"),
+        studentId: form.get("studentId"),
+        school: form.get("school"),
+        className: form.get("className"),
+        title: form.get("title").trim(),
+        instructions: form.get("instructions").trim(),
+        dueAt: form.get("dueAt")
+          ? new Date(`${form.get("dueAt")}T23:59:59+08:00`).toISOString()
+          : null,
+        xpReward: form.get("xpReward"),
+      });
+      await refreshTeacherStudents(currentUser());
+      closeAssignmentEditor();
+      render();
+      toast("任務已成功指派。");
+    } catch (error) {
+      button.disabled = false;
+      button.textContent = "重新指派";
+      toast(`指派失敗：${error.message}`);
+    }
+  });
 }
 
 function bindEvents() {
@@ -1616,7 +1973,7 @@ function bindEvents() {
         data.currentUser = { account: user.account, role: user.role };
         currentPage = isStaffRole(user.role) ? "overview" : "home";
         saveData();
-        await refreshTeacherStudents(user);
+        await refreshUserCloudData(user);
         render();
         return;
       } catch (error) {
@@ -1662,7 +2019,7 @@ function bindEvents() {
         data.currentUser = { account: user.account, role: user.role };
         currentPage = isStaffRole(user.role) ? "overview" : "home";
         saveData();
-        await refreshTeacherStudents(user);
+        await refreshUserCloudData(user);
         render();
         setTimeout(() => toast("雲端註冊成功，歡迎來到 WonderGo！"), 50);
         return;
@@ -1711,6 +2068,10 @@ function bindEvents() {
     startGame("mission", button.dataset.mission);
   }));
 
+  document.querySelectorAll(".assigned-game").forEach((button) => button.addEventListener("click", () => {
+    startAssignedGame(button.dataset.assignment);
+  }));
+
   document.querySelectorAll(".world-country").forEach((button) => button.addEventListener("click", () => {
     selectedWorldCountry = button.dataset.country;
     render();
@@ -1738,8 +2099,71 @@ function bindEvents() {
   }));
 
   document.querySelectorAll(".mission-action").forEach((button) => button.addEventListener("click", () => {
-    toast("原型已記錄操作：任務編輯器將在下一版串接。");
+    if (currentUser()?.role === "teacher" && teacherContent.materials.some((item) => item.status === "published")) {
+      document.body.insertAdjacentHTML(
+        "beforeend",
+        renderAssignmentEditor(currentUser(), button.dataset.targetStudent || ""),
+      );
+      bindAssignmentEditorEvents();
+    } else {
+      toast("請先在教材管理發布一份教材。");
+    }
   }));
+
+  document.querySelectorAll(".open-material-editor").forEach((button) => {
+    button.addEventListener("click", () => {
+      document.body.insertAdjacentHTML("beforeend", renderMaterialEditor());
+      bindMaterialEditorEvents();
+    });
+  });
+
+  document.querySelectorAll(".edit-material").forEach((button) => {
+    button.addEventListener("click", () => {
+      const material = teacherContent.materials.find((item) => item.id === button.dataset.material);
+      if (!material) return;
+      document.body.insertAdjacentHTML("beforeend", renderMaterialEditor(material));
+      bindMaterialEditorEvents();
+    });
+  });
+
+  document.querySelectorAll(".archive-material").forEach((button) => {
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      try {
+        await Cloud.archiveMaterial(button.dataset.material);
+        await refreshTeacherStudents(currentUser());
+        render();
+        toast("教材已封存，既有完成紀錄仍會保留。");
+      } catch (error) {
+        button.disabled = false;
+        toast(`封存失敗：${error.message}`);
+      }
+    });
+  });
+
+  document.querySelectorAll(".open-assignment-editor").forEach((button) => {
+    button.addEventListener("click", () => {
+      if (button.disabled) return;
+      document.body.insertAdjacentHTML("beforeend", renderAssignmentEditor(currentUser()));
+      bindAssignmentEditorEvents();
+    });
+  });
+
+  document.querySelectorAll(".delete-assignment").forEach((button) => {
+    button.addEventListener("click", async () => {
+      if (!window.confirm("確定刪除這項指派任務嗎？已完成紀錄也會一併移除。")) return;
+      button.disabled = true;
+      try {
+        await Cloud.deleteAssignment(button.dataset.assignment);
+        await refreshTeacherStudents(currentUser());
+        render();
+        toast("指派任務已刪除。");
+      } catch (error) {
+        button.disabled = false;
+        toast(`刪除失敗：${error.message}`);
+      }
+    });
+  });
 
   document.querySelectorAll(".approve-teacher").forEach((button) => {
     button.addEventListener("click", async () => {
@@ -1812,8 +2236,6 @@ render();
 
 if (currentUser()?.cloud) {
   const user = currentUser();
-  const refresh = isStaffRole(user.role)
-    ? refreshTeacherStudents(user)
-    : refreshPlayerLearning(user);
+  const refresh = refreshUserCloudData(user);
   refresh.then(render);
 }
