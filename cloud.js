@@ -1,5 +1,6 @@
 const Cloud = (() => {
   const SESSION_KEY = "wondergo-cloud-session";
+  let sessionRefreshPromise = null;
 
   function config() {
     const value = window.WONDERGO_CLOUD;
@@ -25,24 +26,73 @@ const Cloud = (() => {
     else localStorage.removeItem(SESSION_KEY);
   }
 
+  async function refreshSession() {
+    const currentConfig = config();
+    const session = getSession();
+    if (!currentConfig || !session?.refresh_token) {
+      setSession(null);
+      throw new Error("登入已逾時，請重新登入。");
+    }
+    if (!sessionRefreshPromise) {
+      sessionRefreshPromise = fetch(
+        `${currentConfig.url}/auth/v1/token?grant_type=refresh_token`,
+        {
+          method: "POST",
+          headers: {
+            apikey: currentConfig.key,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ refresh_token: session.refresh_token }),
+        },
+      )
+        .then(async (response) => {
+          const body = await response.json();
+          if (!response.ok) {
+            setSession(null);
+            throw new Error("登入已逾時，請重新登入。");
+          }
+          setSession(body);
+          return body;
+        })
+        .finally(() => {
+          sessionRefreshPromise = null;
+        });
+    }
+    return sessionRefreshPromise;
+  }
+
   async function request(path, options = {}) {
     const currentConfig = config();
     if (!currentConfig) throw new Error("尚未設定 Supabase 連線");
-    const session = getSession();
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 20000);
     try {
-      const response = await fetch(`${currentConfig.url}${path}`, {
-        ...options,
-        signal: controller.signal,
-        headers: {
-          apikey: currentConfig.key,
-          Authorization: `Bearer ${options.accessToken || session?.access_token || currentConfig.key}`,
-          "Content-Type": "application/json",
-          ...options.headers,
-        },
-      });
-      const body = response.status === 204 ? null : await response.json();
+      const send = async (accessToken) => {
+        const response = await fetch(`${currentConfig.url}${path}`, {
+          ...options,
+          signal: controller.signal,
+          headers: {
+            apikey: currentConfig.key,
+            Authorization: `Bearer ${accessToken || currentConfig.key}`,
+            "Content-Type": "application/json",
+            ...options.headers,
+          },
+        });
+        const body = response.status === 204 ? null : await response.json();
+        return { response, body };
+      };
+      const session = getSession();
+      let result = await send(options.accessToken || session?.access_token);
+      if (
+        result.response.status === 401 &&
+        !options.accessToken &&
+        session?.refresh_token &&
+        !path.startsWith("/auth/v1/token")
+      ) {
+        const refreshed = await refreshSession();
+        result = await send(refreshed.access_token);
+      }
+      const { response, body } = result;
       if (!response.ok) {
         throw new Error(body?.msg || body?.message || body?.error_description || "雲端服務發生錯誤");
       }

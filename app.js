@@ -362,17 +362,19 @@ function activeStudents() {
 async function refreshTeacherStudents(user) {
   if (!user?.cloud || !isStaffRole(user.role)) return;
   try {
-    const [dashboard, content] = await Promise.all([
-      Cloud.loadStaffDashboard(),
-      user.role === "teacher"
-        ? Cloud.loadTeacherContent()
-        : Promise.resolve({ materials: [], assignments: [] }),
-    ]);
-    staffDashboard = dashboard;
+    staffDashboard = await Cloud.loadStaffDashboard();
     cloudStudents = staffDashboard.students;
-    teacherContent = content;
   } catch (error) {
     toast(`學生資料同步失敗：${error.message}`);
+    return;
+  }
+  if (user.role === "teacher") {
+    try {
+      teacherContent = await Cloud.loadTeacherContent();
+    } catch (error) {
+      teacherContent = { materials: [], assignments: [] };
+      toast(`教材資料同步失敗：${error.message}`);
+    }
   }
 }
 
