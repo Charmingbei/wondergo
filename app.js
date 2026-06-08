@@ -1225,18 +1225,6 @@ function worldSentence(theme, english) {
   return templates[theme.id];
 }
 
-function misspellings(word, fallbackWords) {
-  const plain = word.toLowerCase();
-  const compact = plain.replaceAll(" ", "");
-  const choices = [
-    compact.length > 3 ? `${compact.slice(0, 1)}${compact.slice(2, 3)}${compact.slice(1, 2)}${compact.slice(3)}` : `${compact}e`,
-    compact.length > 3 ? compact.slice(0, -1) : `${compact}${compact.slice(-1)}`,
-    compact.length > 4 ? `${compact.slice(0, 2)}${compact.slice(3)}` : `${compact.slice(0, 1)}a${compact.slice(1)}`,
-    ...fallbackWords.map((item) => item[1]),
-  ];
-  return [...new Set([word, ...choices].filter((item) => item !== word))].slice(0, 4);
-}
-
 function worldStageQuestions(user, theme, stage) {
   const seed = `${getDailyKey()}:${user.account}:${user.cefrLevel}:${theme.id}:${stage.id}`;
   const orderedWords = seededShuffle(theme.words, seed);
@@ -1259,7 +1247,12 @@ function worldStageQuestions(user, theme, stage) {
         sentence,
       ];
     } else if (stage.id === "write") {
-      question = [icon, `選出「${chinese}」的正確拼字。`, misspellings(english, distractors), 0];
+      question = [
+        icon,
+        `看圖選出「${chinese}」的正確英文單字。`,
+        [english, ...distractors.map((item) => item[1])],
+        0,
+      ];
     } else {
       question = [icon, `圖片是「${chinese}」，英文怎麼說？`, [english, ...distractors.map((item) => item[1])], 0];
     }
