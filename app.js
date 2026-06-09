@@ -8,6 +8,49 @@ const abilities = [
   { id: "voice", name: "勇者語音競技場", shortName: "語音引擎", en: "Voice Power", icon: "◍", scene: "🎙️", color: "#f06d73", value: 48, trend: "+8%", description: "開口回應角色，啟動語音引擎" },
 ];
 
+const curriculumCompetencies = [
+  {
+    ability: "echo",
+    domain: "聽力理解",
+    codes: "1-Ⅲ-6、1-Ⅲ-9、1-Ⅲ-10",
+    statement: "能聽懂課堂字詞、簡易句型與日常生活對話。",
+    content: "Ab-Ⅲ 語音、Ac-Ⅲ 字詞與生活用語",
+    activity: "安排短句聽辨、關鍵字圈選與日常對話配對；同一語料採慢速、正常速度兩輪練習。",
+  },
+  {
+    ability: "voice",
+    domain: "口語表達",
+    codes: "2-Ⅲ-2、2-Ⅲ-6、2-Ⅲ-7",
+    statement: "能說出所學字詞，使用日常生活用語並作簡易回答與描述。",
+    content: "B-Ⅲ-2 國小階段字詞及句型的生活溝通",
+    activity: "以句型支架進行兩人問答、圖片描述及角色扮演，每次練習保留一次重新錄音機會。",
+  },
+  {
+    ability: "story",
+    domain: "閱讀理解",
+    codes: "3-Ⅲ-1、3-Ⅲ-4、3-Ⅲ-6",
+    statement: "能辨識所學字詞，看懂課堂句子及簡易短文主要內容。",
+    content: "Ac-Ⅲ-4 國小階段所學字詞、Ae-Ⅲ-1 簡易短文與故事",
+    activity: "先用圖片與標題預測，再進行主旨、細節及句意配對；錯題回到原句標記關鍵線索。",
+  },
+  {
+    ability: "spell",
+    domain: "拼寫與書寫",
+    codes: "4-Ⅲ-3、4-Ⅲ-4、5-Ⅲ-10",
+    statement: "能拼寫基本常用字詞，依圖示填寫字詞並運用拼讀規則拼寫。",
+    content: "Ab-Ⅲ-5 字母拼讀規則、Ac-Ⅲ-4 國小階段所學字詞",
+    activity: "將易錯字依音節切分，進行聽音選字、缺字填空與完整拼寫，隔日再做一次延宕複習。",
+  },
+  {
+    ability: "word",
+    domain: "字詞與綜合應用",
+    codes: "5-Ⅲ-1、5-Ⅲ-3、7-Ⅲ-1",
+    statement: "能認讀與聽寫國小字詞，理解基本句型並運用字詞聯想學習新詞。",
+    content: "Ac-Ⅲ-4 國小階段所學字詞、B-Ⅲ-2 生活溝通",
+    activity: "依主題建立字詞網絡，搭配圖像、例句與分類任務；新詞須放入簡易句型再次運用。",
+  },
+];
+
 const worldThemes = [
   {
     id: "colors", name: "顏色國", en: "Color Kingdom", icon: "🎨", color: "#f06d73",
@@ -979,7 +1022,7 @@ function renderTeacherPage(user) {
   if (currentPage === "students") return renderStudents(user);
   if (currentPage === "missions") return renderAssignmentManager(user);
   if (currentPage === "content") return renderMaterialManager(user);
-  if (currentPage === "analytics") return renderTeacherPlaceholder(user, "教學成效", "追蹤答錯率、完成率與教材調整前後的學習變化。", "⌁");
+  if (currentPage === "analytics") return renderTeacherAnalytics(user);
   return renderTeacherOverview(user);
 }
 
@@ -1740,6 +1783,106 @@ function renderAdminAnalytics(user) {
     ${renderErrorAnalysis(dashboard.errorAnalysis)}
     <div class="section-title"><div><h2>班級能力比較</h2><p>各班目前五大能力平均</p></div></div>
     ${renderClassCards(dashboard.classes)}`;
+}
+
+function curriculumPerformance(classroom) {
+  const students = classroom?.students || [];
+  return curriculumCompetencies.map((competency) => {
+    const abilityIndex = abilities.findIndex((ability) => ability.id === competency.ability);
+    const attempts = students.flatMap((student) => student.attempts || [])
+      .filter((attempt) => attempt.ability === competency.ability);
+    const correct = attempts.filter((attempt) => attempt.is_correct).length;
+    const abilityAverage = classroom?.abilities?.[abilityIndex] || 0;
+    const score = attempts.length
+      ? Math.round((correct / attempts.length) * 100)
+      : abilityAverage;
+    const needsSupport = students.filter((student) =>
+      Number(student.abilities?.[abilityIndex] || 0) < 60).length;
+    const status = score >= 80 ? "穩定達成" : score >= 60 ? "發展中" : "優先補強";
+    return {
+      ...competency,
+      score,
+      status,
+      attempts: attempts.length,
+      correct,
+      needsSupport,
+    };
+  });
+}
+
+function renderTeacherAnalytics(user) {
+  const classes = teacherClasses();
+  const classroom = selectedTeacherClass();
+  const students = classroom?.students || [];
+  const performance = curriculumPerformance(classroom);
+  const measured = performance.filter((item) => item.attempts > 0);
+  const overall = measured.length
+    ? Math.round(measured.reduce((sum, item) => sum + item.score, 0) / measured.length)
+    : Math.round(performance.reduce((sum, item) => sum + item.score, 0) / performance.length);
+  const strongest = [...performance].sort((a, b) => b.score - a.score)[0];
+  const priority = [...performance].sort((a, b) => a.score - b.score)[0];
+  const totalAttempts = students.reduce((sum, student) => sum + (student.attempts?.length || 0), 0);
+  const studyDays = students.length
+    ? Math.round(students.reduce((sum, student) => sum + student.days, 0) / students.length * 10) / 10
+    : 0;
+  return `
+    ${teacherHeader(user, "課綱能力診斷", "依十二年國教英語文學習表現，分析本週班級證據並提供教學建議")}
+    <section class="card learning-filter-bar analytics-filter">
+      <div class="field"><label>診斷班級</label><select id="analytics-class-filter">${classes.map((item) => `<option value="${escapeHTML(item.key)}" ${item.key === classroom?.key ? "selected" : ""}>${escapeHTML(item.school)}・${escapeHTML(item.className)}</option>`).join("")}</select></div>
+      <div class="curriculum-disclaimer"><b>診斷依據</b><span>WonderGo 將平台作答紀錄對照國小英語文課綱學習表現；本報告供形成性評量與教學調整使用，並非官方認證成績。<a href="https://www.naer.edu.tw/PageSyllabus?fid=177" target="_blank" rel="noopener">查看國教院正式課綱</a></span></div>
+    </section>
+    <section class="metric-grid curriculum-metrics">
+      <article class="card metric"><span>課綱能力整體表現</span><strong>${overall} 分</strong><small>${overall >= 80 ? "穩定達成" : overall >= 60 ? "持續發展" : "需要系統補強"}</small></article>
+      <article class="card metric"><span>本週診斷證據</span><strong>${totalAttempts} 題</strong><small>${students.length} 位學生的實際作答</small></article>
+      <article class="card metric"><span>班級平均學習天數</span><strong>${studyDays} 天</strong><small>搭配作答表現判讀</small></article>
+    </section>
+    ${students.length ? `
+      <section class="curriculum-summary-grid">
+        <article class="card curriculum-summary strength">
+          <span>班級優勢</span>
+          <h2>${strongest.domain}｜${strongest.score} 分</h2>
+          <p>${strongest.statement}</p>
+          <b>建議：保留既有練習，增加跨情境應用與高層次挑戰。</b>
+        </article>
+        <article class="card curriculum-summary priority">
+          <span>優先教學焦點</span>
+          <h2>${priority.domain}｜${priority.score} 分</h2>
+          <p>${priority.statement}</p>
+          <b>建議：${priority.activity}</b>
+        </article>
+      </section>
+      <div class="section-title"><div><h2>課綱能力表現診斷</h2><p>分數以本週同面向答題正確率為主；尚無作答時，以目前能力值作初步判讀。</p></div></div>
+      <section class="curriculum-diagnostic-list">
+        ${performance.map((item) => {
+          const ability = abilities.find((entry) => entry.id === item.ability);
+          return `
+            <article class="card curriculum-diagnostic" style="--curriculum-color:${ability.color}">
+              <div class="curriculum-score">
+                <span>${ability.scene}</span>
+                <strong>${item.score}</strong>
+                <small>${item.status}</small>
+              </div>
+              <div class="curriculum-detail">
+                <div class="curriculum-title"><div><span class="mission-tag">${item.codes}</span><h3>${item.domain}</h3></div><b>${item.attempts ? `${item.correct}／${item.attempts} 題答對` : "尚無本週作答"}</b></div>
+                <p class="curriculum-statement">${item.statement}</p>
+                <p class="curriculum-content"><b>對應學習內容：</b>${item.content}</p>
+                <div class="curriculum-evidence"><span>本週證據 ${item.attempts} 題</span><span>${item.needsSupport} 位學生低於 60</span></div>
+                <div class="curriculum-bar"><span style="width:${item.score}%"></span></div>
+                <div class="teaching-recommendation"><b>教學建議</b><p>${item.activity}</p></div>
+              </div>
+            </article>`;
+        }).join("")}
+      </section>
+      <section class="card teaching-plan">
+        <div><span class="quest-eyebrow">NEXT TEACHING CYCLE</span><h2>下一輪教學調整建議</h2></div>
+        <ol>
+          <li><b>課前診斷：</b>先用 5 題「${priority.domain}」短測確認錯誤是否集中於特定字詞、句型或題型。</li>
+          <li><b>課中介入：</b>${priority.activity}</li>
+          <li><b>差異化分組：</b>將 ${priority.needsSupport} 位需要補強的學生安排基礎任務，其餘學生進行情境應用挑戰。</li>
+          <li><b>課後檢核：</b>隔 2 至 3 天以不同題目重測；正確率達 80% 再進入下一學習內容。</li>
+        </ol>
+      </section>
+    ` : '<section class="card empty-page"><div><div class="big-icon">⌁</div><h2>此班級尚無可診斷資料</h2><p style="color:var(--muted)">學生完成訓練或教師任務後，系統會自動對照課綱能力並提出教學建議。</p></div></section>'}`;
 }
 
 function renderTeacherOverview(user) {
@@ -2870,6 +3013,11 @@ function bindEvents() {
 
   document.getElementById("learning-student-filter")?.addEventListener("change", (event) => {
     selectedStudent = Number(event.target.value);
+    render();
+  });
+
+  document.getElementById("analytics-class-filter")?.addEventListener("change", (event) => {
+    selectedClassKey = event.target.value;
     render();
   });
 
