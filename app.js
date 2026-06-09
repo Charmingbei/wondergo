@@ -1186,6 +1186,138 @@ function teachingTermsFromText(text) {
   return [...new Map(terms.map((term) => [term.english.toLowerCase(), term])).values()];
 }
 
+const externalScriptPromises = new Map();
+
+function loadExternalScript(src, globalName) {
+  if (globalName && window[globalName]) return Promise.resolve(window[globalName]);
+  if (externalScriptPromises.has(src)) return externalScriptPromises.get(src);
+  const promise = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = src;
+    script.onload = () => resolve(globalName ? window[globalName] : true);
+    script.onerror = () => reject(new Error("文件解析元件載入失敗，請確認網路後重試。"));
+    document.head.appendChild(script);
+  });
+  externalScriptPromises.set(src, promise);
+  return promise;
+}
+
+function normalizedFileExtension(fileName) {
+  return fileName.toLowerCase().split(".").pop() || "";
+}
+
+function extractXmlText(xml) {
+  const spacedXml = xml
+    .replace(/<\/(?:w:p|a:p|text:p|table:table-row)>/g, "\n")
+    .replace(/<\/(?:w:tc|a:r|table:table-cell)>/g, "\t");
+  const documentNode = new DOMParser().parseFromString(spacedXml, "application/xml");
+  return documentNode.documentElement?.textContent
+    ?.replace(/[ \f\v]+/g, " ")
+    .replace(/\t+/g, "\t")
+    .replace(/\n\s*/g, "\n")
+    .replace(/([.!?。！？])\s*/g, "$1\n")
+    .trim() || "";
+}
+
+async function extractZipDocumentText(file, extension) {
+  await loadExternalScript(
+    "https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js",
+    "JSZip",
+  );
+  const archive = await window.JSZip.loadAsync(await file.arrayBuffer());
+  let paths = [];
+  if (extension === "docx") paths = ["word/document.xml"];
+  if (extension === "pptx") {
+    paths = Object.keys(archive.files)
+      .filter((path) => /^ppt\/slides\/slide\d+\.xml$/.test(path))
+      .sort((a, b) => Number(a.match(/\d+/)?.[0]) - Number(b.match(/\d+/)?.[0]));
+  }
+  if (extension === "odt") paths = ["content.xml"];
+  const parts = await Promise.all(paths.map(async (path) => {
+    const entry = archive.file(path);
+    return entry ? extractXmlText(await entry.async("text")) : "";
+  }));
+  return parts.filter(Boolean).join("\n");
+}
+
+async function extractSpreadsheetText(file) {
+  await loadExternalScript(
+    "https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js",
+    "XLSX",
+  );
+  const workbook = window.XLSX.read(await file.arrayBuffer());
+  return workbook.SheetNames.map((name) => {
+    const csv = window.XLSX.utils.sheet_to_csv(workbook.Sheets[name]);
+    return csv ? `【${name}】\n${csv}` : "";
+  }).filter(Boolean).join("\n\n");
+}
+
+async function extractPdfText(file) {
+  const pdfjs = await import(
+    "https://cdn.jsdelivr.net/npm/pdfjs-dist@5.4.624/build/pdf.mjs"
+  );
+  pdfjs.GlobalWorkerOptions.workerSrc =
+    "https://cdn.jsdelivr.net/npm/pdfjs-dist@5.4.624/build/pdf.worker.mjs";
+  const pdf = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
+  const pages = [];
+  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+    const page = await pdf.getPage(pageNumber);
+    const content = await page.getTextContent();
+    pages.push(content.items.map((item) => item.str).join(" "));
+  }
+  return pages.join("\n");
+}
+
+async function extractImageText(file, onProgress) {
+  await loadExternalScript(
+    "https://cdn.jsdelivr.net/npm/tesseract.js@7/dist/tesseract.min.js",
+    "Tesseract",
+  );
+  const result = await window.Tesseract.recognize(file, "eng+chi_tra", {
+    logger: (message) => {
+      if (message.status === "recognizing text") {
+        onProgress?.(`圖片文字辨識中 ${Math.round((message.progress || 0) * 100)}%`);
+      }
+    },
+  });
+  return result.data.text;
+}
+
+async function extractTeachingMaterialText(file, onProgress) {
+  const extension = normalizedFileExtension(file.name);
+  const textExtensions = new Set(["txt", "csv", "tsv", "md", "json", "html", "htm", "xml", "srt"]);
+  const spreadsheetExtensions = new Set(["xlsx", "xls", "xlsb", "ods", "numbers"]);
+  const zipDocumentExtensions = new Set(["docx", "pptx", "odt"]);
+  const imageExtensions = new Set(["png", "jpg", "jpeg", "webp", "bmp", "gif", "tif", "tiff"]);
+  if (file.size > 25 * 1024 * 1024) {
+    throw new Error("檔案超過 25 MB，請先壓縮圖片或分成較小的教材檔案。");
+  }
+  if (textExtensions.has(extension) || file.type.startsWith("text/")) return file.text();
+  if (extension === "pdf" || file.type === "application/pdf") {
+    onProgress?.("正在讀取 PDF 文字...");
+    return extractPdfText(file);
+  }
+  if (spreadsheetExtensions.has(extension)) {
+    onProgress?.("正在讀取試算表...");
+    return extractSpreadsheetText(file);
+  }
+  if (zipDocumentExtensions.has(extension)) {
+    onProgress?.(`正在讀取 ${extension.toUpperCase()} 文件...`);
+    return extractZipDocumentText(file, extension);
+  }
+  if (imageExtensions.has(extension) || file.type.startsWith("image/")) {
+    onProgress?.("準備進行圖片文字辨識...");
+    return extractImageText(file, onProgress);
+  }
+  const fallbackText = await file.text();
+  const readableCharacters = [...fallbackText.slice(0, 2000)]
+    .filter((character) => /[\p{L}\p{N}\p{P}\p{Z}\r\n\t]/u.test(character)).length;
+  if (fallbackText.length && readableCharacters / Math.min(fallbackText.length, 2000) > 0.75) {
+    return fallbackText;
+  }
+  throw new Error("此格式無法直接擷取文字。請匯出為 PDF、Word、PowerPoint、Excel、圖片或文字檔後再上傳。");
+}
+
 function spellingDistractors(word) {
   const clean = word.trim();
   const candidates = [
@@ -1339,15 +1471,15 @@ function renderMaterialEditor(material = null) {
     <div class="game-modal batch-import-modal hidden" id="ai-generator-modal">
       <article class="game-card batch-import-card">
         <header><div><span class="mission-tag">智慧題目助手</span><h2>從授課資料快速產生題目</h2></div><button class="ghost-btn" id="close-ai-generator" type="button">✕</button></header>
-        <div class="ai-generator-intro"><b>1. 上傳或貼上授課資料</b><p>目前支援 TXT、CSV，或每行輸入一組「英文、中文」，例如：apple, 蘋果。</p></div>
-        <label class="secondary-btn teaching-file-button">上傳授課資料<input id="teaching-material-file" type="file" accept=".txt,.csv,text/plain,text/csv" /></label>
-        <small id="teaching-file-status" class="field-help">也可以直接貼到下方文字框</small>
+        <div class="ai-generator-intro"><b>1. 上傳或貼上授課資料</b><p>支援 PDF、Word、PowerPoint、Excel、CSV、TXT、Markdown、網頁文字與常見圖片；其他格式也可選取，系統會嘗試辨識。</p></div>
+        <label class="secondary-btn teaching-file-button">選擇任何授課檔案<input id="teaching-material-file" type="file" /></label>
+        <small id="teaching-file-status" class="field-help">單檔上限 25 MB，也可以直接貼到下方文字框</small>
         <textarea class="question-source" id="teaching-material-source" rows="9" placeholder="apple, 蘋果&#10;banana, 香蕉&#10;orange, 柳橙&#10;grape, 葡萄"></textarea>
         <div class="form-grid ai-generator-options">
           <div class="field"><label>選擇題型</label><select id="ai-question-type"><option value="word">單字辨識</option><option value="listen">聽力理解</option><option value="read">閱讀理解</option><option value="spell">拼字工藝</option><option value="speak">口說跟讀</option></select></div>
           <div class="field"><label>產生題數</label><select id="ai-question-count"><option>5</option><option selected>10</option><option>15</option><option>20</option></select></div>
         </div>
-        <div class="ai-generator-note">系統會先產生題目草稿，教師仍可逐題修改答案、選項及語音內容後再發布。</div>
+        <div class="ai-generator-note">檔案內容只在目前瀏覽器中解析，不會另外儲存原始檔。系統會先產生題目草稿，教師仍可逐題修改後再發布。</div>
         <div class="editor-actions"><button class="ghost-btn" id="cancel-ai-generator" type="button">取消</button><button class="primary-btn" id="generate-ai-questions" type="button">分析教材並產生題目</button></div>
       </article>
     </div>
@@ -2294,11 +2426,23 @@ function bindMaterialEditorEvents() {
     const file = event.target.files?.[0];
     if (!file) return;
     const status = document.getElementById("teaching-file-status");
+    const source = document.getElementById("teaching-material-source");
+    if (status) status.textContent = `正在分析 ${file.name}...`;
     try {
-      document.getElementById("teaching-material-source").value = await file.text();
-      if (status) status.textContent = `已讀取 ${file.name}，請選擇題型後產生題目。`;
-    } catch {
-      if (status) status.textContent = "檔案讀取失敗，請改用 TXT 或 CSV。";
+      const text = await extractTeachingMaterialText(file, (message) => {
+        if (status) status.textContent = `${message}｜${file.name}`;
+      });
+      if (!text.trim()) {
+        throw new Error("檔案內沒有可擷取的文字。若是掃描 PDF，請改上傳頁面圖片進行 OCR。");
+      }
+      source.value = text.trim();
+      if (status) {
+        status.textContent =
+          `已讀取 ${file.name}（${text.trim().length.toLocaleString()} 字），請確認內容並選擇題型。`;
+      }
+    } catch (error) {
+      if (status) status.textContent = `無法讀取 ${file.name}`;
+      toast(error.message);
     }
   });
   document.getElementById("generate-ai-questions")?.addEventListener("click", () => {
