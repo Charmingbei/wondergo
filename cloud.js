@@ -523,24 +523,26 @@ const Cloud = (() => {
     return mapMaterial(rows[0]);
   }
 
-  async function createAssignment(values) {
+  async function createAssignments(values) {
     const session = getSession();
+    const studentIds = values.studentIds?.length ? values.studentIds : [null];
+    const payload = studentIds.map((studentId) => ({
+      teacher_id: session.user.id,
+      material_id: values.materialId,
+      student_id: studentId,
+      school: values.school,
+      class_name: values.className,
+      title: values.title,
+      instructions: values.instructions || "",
+      due_at: values.dueAt || null,
+      xp_reward: Number(values.xpReward),
+    }));
     const rows = await request("/rest/v1/learning_assignments", {
       method: "POST",
       headers: { Prefer: "return=representation" },
-      body: JSON.stringify({
-        teacher_id: session.user.id,
-        material_id: values.materialId,
-        student_id: values.studentId || null,
-        school: values.school,
-        class_name: values.className,
-        title: values.title,
-        instructions: values.instructions || "",
-        due_at: values.dueAt || null,
-        xp_reward: Number(values.xpReward),
-      }),
+      body: JSON.stringify(payload),
     });
-    return mapAssignment(rows[0]);
+    return rows.map(mapAssignment);
   }
 
   async function deleteAssignment(assignmentId) {
@@ -715,7 +717,7 @@ const Cloud = (() => {
     loadTeacherContent,
     saveMaterial,
     archiveMaterial,
-    createAssignment,
+    createAssignments,
     deleteAssignment,
     loadPlayerAssignments,
     completeAssignment,

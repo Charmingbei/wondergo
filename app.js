@@ -1032,14 +1032,14 @@ function renderAssignmentManager(user) {
   const materials = teacherContent.materials.filter((item) => item.status === "published");
   const assignments = teacherContent.assignments || [];
   return `
-    ${teacherHeader(user, "指派任務", "將已發布教材指派給全班或個別學生")}
+    ${teacherHeader(user, "指派任務", "將已發布教材指派給全班、個別學生或自選小組")}
     <section class="metric-grid">
       <article class="card metric"><span>已指派任務</span><strong>${assignments.length} 項</strong><small>目前班級的任務紀錄</small></article>
       <article class="card metric"><span>可用教材</span><strong>${materials.length} 份</strong><small>已發布教材</small></article>
       <article class="card metric"><span>完成紀錄</span><strong>${assignments.reduce((sum, item) => sum + item.completions.length, 0)} 人次</strong><small>學生已完成的任務</small></article>
     </section>
     <div class="section-title material-heading">
-      <div><h2>班級任務</h2><p>可指派全班，或針對需要補強的學生單獨安排。</p></div>
+      <div><h2>班級任務</h2><p>可指派全班、單一學生，或勾選多位學生組成這次任務小組。</p></div>
       <button class="primary-btn open-assignment-editor" ${materials.length ? "" : "disabled"}>＋ 指派任務</button>
     </div>
     ${materials.length ? "" : '<div class="insight focus"><span>!</span><div><b>請先發布教材</b><p>前往教材管理建立題組，狀態設為「發布」後即可指派。</p></div></div>'}
@@ -1064,6 +1064,7 @@ function renderAssignmentManager(user) {
 
 function renderAssignmentEditor(user, targetStudentId = "") {
   const materials = teacherContent.materials.filter((item) => item.status === "published");
+  const initialMode = targetStudentId ? "individual" : "class";
   return `
     <div class="game-modal admin-edit-modal" id="assignment-editor-modal">
       <article class="game-card admin-edit-card">
@@ -1072,7 +1073,29 @@ function renderAssignmentEditor(user, targetStudentId = "") {
           <div class="form-grid">
             <div class="field full"><label>選擇教材</label><select name="materialId" id="assignment-material" required>${materials.map((item) => `<option value="${item.id}">${escapeHTML(item.title)}（${item.cefrLevel}・${item.questions.length} 題）</option>`).join("")}</select></div>
             <div class="field full"><label>任務名稱</label><input name="title" maxlength="120" value="${escapeHTML(materials[0]?.title || "")}" required /></div>
-            <div class="field full"><label>指派對象</label><select name="studentId"><option value="">全班學生</option>${cloudStudents.map((student) => `<option value="${student.id}" ${student.id === targetStudentId ? "selected" : ""}>${escapeHTML(student.name)}（${escapeHTML(student.seat)}號）</option>`).join("")}</select></div>
+            <div class="field full">
+              <label>派發方式</label>
+              <div class="target-mode-switch">
+                <label><input type="radio" name="targetMode" value="class" ${initialMode === "class" ? "checked" : ""} /> 全班派發</label>
+                <label><input type="radio" name="targetMode" value="individual" ${initialMode === "individual" ? "checked" : ""} /> 個別派發</label>
+                <label><input type="radio" name="targetMode" value="group" /> 小組派發</label>
+              </div>
+            </div>
+            <div class="field full assignment-target-panel ${initialMode === "individual" ? "" : "hidden"}" data-target-panel="individual">
+              <label>選擇一位學生</label>
+              <select name="individualStudentId">${cloudStudents.map((student) => `<option value="${student.id}" ${student.id === targetStudentId ? "selected" : ""}>${escapeHTML(student.name)}（${escapeHTML(student.seat)}號）</option>`).join("")}</select>
+            </div>
+            <div class="field full assignment-target-panel hidden" data-target-panel="group">
+              <label>勾選小組成員</label>
+              <div class="group-student-picker">
+                ${cloudStudents.map((student) => `
+                  <label>
+                    <input type="checkbox" name="groupStudentId" value="${student.id}" />
+                    <span><b>${escapeHTML(student.name)}</b><small>${escapeHTML(student.seat)}號・${escapeHTML(student.level)}</small></span>
+                  </label>`).join("") || '<p class="empty-hint">目前班級沒有可選擇的學生。</p>'}
+              </div>
+              <small class="field-help">至少選擇 2 位學生；本次派發後，每位組員會收到自己的任務。</small>
+            </div>
             <div class="field"><label>截止日期</label><input name="dueAt" type="date" /></div>
             <div class="field"><label>完成獎勵 XP</label><input name="xpReward" type="number" min="10" max="200" value="50" required /></div>
             <div class="field full"><label>任務說明</label><textarea name="instructions" rows="3" placeholder="例：完成後請複習答錯的單字。"></textarea></div>
@@ -1826,16 +1849,37 @@ function bindAssignmentEditorEvents() {
     const titleInput = document.querySelector('#assignment-form [name="title"]');
     if (material && titleInput) titleInput.value = material.title;
   });
+  const syncTargetPanels = () => {
+    const mode = document.querySelector('#assignment-form [name="targetMode"]:checked')?.value;
+    document.querySelectorAll(".assignment-target-panel").forEach((panel) => {
+      panel.classList.toggle("hidden", panel.dataset.targetPanel !== mode);
+    });
+  };
+  document.querySelectorAll('#assignment-form [name="targetMode"]').forEach((radio) => {
+    radio.addEventListener("change", syncTargetPanels);
+  });
+  syncTargetPanels();
   document.getElementById("assignment-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const button = document.getElementById("save-assignment");
+    const targetMode = form.get("targetMode");
+    let studentIds = [];
+    if (targetMode === "individual") {
+      const studentId = form.get("individualStudentId");
+      if (!studentId) return toast("請選擇一位學生。");
+      studentIds = [studentId];
+    }
+    if (targetMode === "group") {
+      studentIds = form.getAll("groupStudentId");
+      if (studentIds.length < 2) return toast("小組派發請至少選擇 2 位學生。");
+    }
     button.disabled = true;
-    button.textContent = "任務指派中...";
+    button.textContent = targetMode === "group" ? `正在派發給 ${studentIds.length} 位學生...` : "任務指派中...";
     try {
-      await Cloud.createAssignment({
+      await Cloud.createAssignments({
         materialId: form.get("materialId"),
-        studentId: form.get("studentId"),
+        studentIds,
         school: form.get("school"),
         className: form.get("className"),
         title: form.get("title").trim(),
@@ -1848,7 +1892,7 @@ function bindAssignmentEditorEvents() {
       await refreshTeacherStudents(currentUser());
       closeAssignmentEditor();
       render();
-      toast("任務已成功指派。");
+      toast(targetMode === "class" ? "任務已派發給全班。" : targetMode === "group" ? `任務已派發給 ${studentIds.length} 位小組成員。` : "任務已派發給指定學生。");
     } catch (error) {
       button.disabled = false;
       button.textContent = "重新指派";

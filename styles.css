@@ -1986,6 +1986,90 @@ button {
   font-weight: 800;
 }
 
+.target-mode-switch {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 9px;
+}
+
+.target-mode-switch label {
+  position: relative;
+  display: grid;
+  min-height: 52px;
+  place-items: center;
+  padding: 10px;
+  border: 2px solid #e5e1ee;
+  border-radius: 14px;
+  color: var(--muted);
+  background: #fff;
+  font-size: 13px;
+  font-weight: 900;
+  text-align: center;
+  cursor: pointer;
+}
+
+.target-mode-switch input {
+  position: absolute;
+  opacity: 0;
+}
+
+.target-mode-switch label:has(input:checked) {
+  border-color: var(--purple);
+  color: var(--purple);
+  background: var(--purple-soft);
+  box-shadow: inset 0 0 0 1px var(--purple);
+}
+
+.assignment-target-panel.hidden {
+  display: none;
+}
+
+.group-student-picker {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 9px;
+  max-height: 255px;
+  padding: 4px;
+  overflow-y: auto;
+}
+
+.group-student-picker > label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  border: 2px solid #e8e4f0;
+  border-radius: 14px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.group-student-picker > label:has(input:checked) {
+  border-color: var(--aqua);
+  background: #eafbf8;
+}
+
+.group-student-picker input {
+  width: 19px;
+  height: 19px;
+  flex: 0 0 auto;
+  accent-color: var(--aqua);
+}
+
+.group-student-picker span {
+  display: grid;
+  gap: 2px;
+}
+
+.group-student-picker b {
+  font-size: 13px;
+}
+
+.group-student-picker small {
+  color: var(--muted);
+  font-size: 10px;
+}
+
 .ability-page {
   display: grid;
   grid-template-columns: 0.8fr 1.2fr;
@@ -3057,6 +3141,19 @@ td {
 
   .question-source {
     min-height: 260px;
+  }
+
+  .target-mode-switch,
+  .group-student-picker {
+    grid-template-columns: 1fr;
+  }
+
+  .target-mode-switch {
+    gap: 7px;
+  }
+
+  .target-mode-switch label {
+    min-height: 44px;
   }
 
   .daily-quests {
