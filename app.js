@@ -279,7 +279,8 @@ let authRole = "player";
 let authMode = "login";
 let recoveryToken = "";
 let currentPage = "home";
-let selectedStudent = 0;
+let selectedStudent = -1;
+let selectedClassKey = "";
 let cloudStudents = [];
 let staffDashboard = null;
 let adminAccountFilter = "all";
@@ -356,7 +357,23 @@ async function refreshPlayerLearning(user) {
 }
 
 function activeStudents() {
-  return currentUser()?.cloud ? cloudStudents : demoStudents;
+  if (!currentUser()?.cloud) return demoStudents;
+  const classroom = selectedTeacherClass();
+  return classroom ? classroom.students : cloudStudents;
+}
+
+function teacherClasses() {
+  return staffDashboard?.classes || [];
+}
+
+function selectedTeacherClass() {
+  const classes = teacherClasses();
+  if (!classes.length) return null;
+  const user = currentUser();
+  const defaultKey = `${user?.school || ""}::${user?.className || ""}`;
+  return classes.find((classroom) => classroom.key === selectedClassKey)
+    || classes.find((classroom) => classroom.key === defaultKey)
+    || classes[0];
 }
 
 async function refreshTeacherStudents(user) {
@@ -364,6 +381,7 @@ async function refreshTeacherStudents(user) {
   try {
     staffDashboard = await Cloud.loadStaffDashboard();
     cloudStudents = staffDashboard.students;
+    if (!selectedClassKey) selectedClassKey = selectedTeacherClass()?.key || "";
   } catch (error) {
     toast(`學生資料同步失敗：${error.message}`);
     return;
@@ -545,7 +563,6 @@ function renderSidebar(user, isTeacher) {
   const playerNav = [
     ["home", "⌂", "冒險首頁"],
     ["training", "✦", "五大訓練館"],
-    ["ability", "◈", "我的能力"],
     ["world", "◎", "世界地圖"],
     ["report", "▤", "托奇週報"],
   ];
@@ -591,7 +608,7 @@ function playerHeader(user, title, subtitle) {
 
 function renderPlayerPage(user) {
   if (currentPage === "training") return renderTraining(user);
-  if (currentPage === "ability") return renderAbility(user);
+  if (currentPage === "ability") return renderPlayerHome(user);
   if (currentPage === "world") return renderWorldPage(user);
   if (currentPage === "report") return renderReport(user);
   return renderPlayerHome(user);
@@ -602,7 +619,8 @@ function renderPlayerHome(user) {
     ${playerHeader(user, `嗨，${escapeHTML(user.account)}！`, "今天也和 Toki 一起前進一點吧。")}
     ${renderPlayerAssignments()}
     ${renderMissions()}
-    ${renderTrainingMap(user)}`;
+    ${renderTrainingMap(user)}
+    ${renderAbilityDashboard(user)}`;
 }
 
 function renderPlayerAssignments() {
@@ -884,6 +902,45 @@ function renderAbility(user) {
     </section>`;
 }
 
+function renderAbilityDashboard(user) {
+  const actualAbilities = playerAbilities(user);
+  const weeklyGrowth = actualAbilities.reduce((sum, ability) => sum + ability.trendValue, 0);
+  const strongest = [...actualAbilities].sort((a, b) => b.value - a.value)[0];
+  const weakest = [...actualAbilities].sort((a, b) => a.value - b.value)[0];
+  const hasLearningData = actualAbilities.some((ability) => ability.value > 0);
+  return `
+    <section class="home-ability-section">
+      <div class="section-title">
+        <div><span class="quest-eyebrow">ADVENTURE STATUS</span><h2>我的能力</h2><p>依照實際學習紀錄，即時更新五大冒險能力。</p></div>
+        <span class="quest-reward">${weeklyGrowth ? `本週完成 ${weeklyGrowth} 次訓練` : "完成訓練啟動分析"}</span>
+      </div>
+      <section class="ability-page">
+        <article class="card profile-card">
+          <div class="profile-orb"><img src="assets/toki.png" alt="Toki 夥伴" /></div>
+          <h2>${escapeHTML(user.account)}</h2>
+          <p style="color:var(--muted)">Lv.${user.level || 1}｜城市探索者｜CEFR ${escapeHTML(user.cefrLevel || "Pre-A1")}</p>
+          <div class="radar-wrap">${radarSVG(actualAbilities)}</div>
+          <b>${weeklyGrowth ? `本週完成 ${weeklyGrowth} 次能力訓練` : "本週尚未開始能力訓練"}</b>
+        </article>
+        <div>
+          <article class="card report-card">
+            <h2>五大冒險能力</h2>
+            <div class="ability-list">
+              ${actualAbilities.map((ability) => `<div class="ability-row"><span class="ability-icon" style="background:${ability.color}">${ability.icon}</span><div><h4>${ability.name}</h4><p>${ability.en}｜本週完成 ${ability.trendValue} 次</p></div><strong>${ability.value}</strong></div>`).join("")}
+            </div>
+          </article>
+          <article class="card report-card" style="margin-top:20px">
+            <h2>Toki 的學習分析</h2>
+            ${hasLearningData ? `
+              <div class="insight good"><span>✨</span><div><b>${strongest.name}是目前最強能力</b><p>目前能力值 ${strongest.value}，持續挑戰能讓優勢更穩定。</p></div></div>
+              <div class="insight focus"><span>⚡</span><div><b>下一步補強 ${weakest.name}</b><p>目前能力值 ${weakest.value}，建議今天完成一次相關場館任務。</p></div></div>
+            ` : '<div class="insight focus"><span>✦</span><div><b>完成第一座訓練館，啟動能力分析</b><p>完成任一場館的 10 題練習後，雷達圖會依實際表現更新。</p></div></div>'}
+          </article>
+        </div>
+      </section>
+    </section>`;
+}
+
 function renderReport(user) {
   return `
     ${playerHeader(user, "托奇週報", "每週六發送，讓每一點努力都看得見。")}
@@ -1072,6 +1129,113 @@ function parseMaterialCsv(text) {
   return questions;
 }
 
+function loadPublicGoogleSheet(sheetUrl) {
+  const id = sheetUrl.match(/docs\.google\.com\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/)?.[1];
+  if (!id) return Promise.reject(new Error("請貼上 Google 試算表的完整分享網址。"));
+  const gid = sheetUrl.match(/[?#&]gid=(\d+)/)?.[1] || "0";
+  return new Promise((resolve, reject) => {
+    const callbackName = `wonderGoSheet${Date.now()}`;
+    const script = document.createElement("script");
+    const cleanup = () => {
+      script.remove();
+      delete window[callbackName];
+    };
+    const timeout = window.setTimeout(() => {
+      cleanup();
+      reject(new Error("讀取逾時，請確認試算表已開放「知道連結的使用者可查看」。"));
+    }, 15000);
+    window[callbackName] = (result) => {
+      window.clearTimeout(timeout);
+      try {
+        if (result.status === "error" || !result.table) {
+          throw new Error("無法讀取試算表，請確認分享權限及工作表網址。");
+        }
+        const headers = result.table.cols.map((column) => column.label || column.id || "");
+        const rows = result.table.rows.map((row) =>
+          headers.map((_, index) => row.c?.[index]?.v ?? ""));
+        const csvCell = (value) => `"${String(value).replaceAll('"', '""')}"`;
+        resolve([headers, ...rows].map((row) => row.map(csvCell).join(",")).join("\n"));
+      } catch (error) {
+        reject(error);
+      } finally {
+        cleanup();
+      }
+    };
+    script.onerror = () => {
+      window.clearTimeout(timeout);
+      cleanup();
+      reject(new Error("Google 試算表讀取失敗，請稍後再試。"));
+    };
+    script.src = `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=responseHandler:${callbackName}&gid=${gid}`;
+    document.head.appendChild(script);
+  });
+}
+
+function teachingTermsFromText(text) {
+  const terms = text.split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const englishFirst = line.match(/^([A-Za-z][A-Za-z '\-]{1,40})\s*[,，\t:：|｜]\s*(.+)$/);
+      if (englishFirst) return { english: englishFirst[1].trim(), meaning: englishFirst[2].trim() };
+      const chineseFirst = line.match(/^(.+?)\s*[,，\t:：|｜]\s*([A-Za-z][A-Za-z '\-]{1,40})$/);
+      if (chineseFirst) return { english: chineseFirst[2].trim(), meaning: chineseFirst[1].trim() };
+      return null;
+    })
+    .filter(Boolean);
+  return [...new Map(terms.map((term) => [term.english.toLowerCase(), term])).values()];
+}
+
+function spellingDistractors(word) {
+  const clean = word.trim();
+  const candidates = [
+    clean.length > 3 ? `${clean.slice(0, 1)}${clean[2]}${clean[1]}${clean.slice(3)}` : `${clean}e`,
+    clean.length > 3 ? `${clean.slice(0, -1)}${clean.at(-2)}` : `${clean.slice(0, -1)}`,
+    `${clean.slice(0, 1)}${clean.slice(1).replace(/[aeiou]/i, "a")}`,
+    `${clean}${clean.at(-1)}`,
+  ].filter((item) => item && item.toLowerCase() !== clean.toLowerCase());
+  return [...new Set(candidates)].slice(0, 3);
+}
+
+function generateQuestionsFromTeachingText(text, type, requestedCount) {
+  const terms = teachingTermsFromText(text);
+  if (terms.length < 4) {
+    throw new Error("授課資料至少需要 4 組「英文、中文」內容，每組一行。");
+  }
+  const count = Math.min(Number(requestedCount) || 10, terms.length, 20);
+  return terms.slice(0, count).map((term, index) => {
+    const distractorTerms = terms.filter((item) => item !== term)
+      .slice(index % Math.max(1, terms.length - 3))
+      .concat(terms)
+      .filter((item, itemIndex, list) =>
+        item !== term && list.findIndex((candidate) => candidate.english === item.english) === itemIndex)
+      .slice(0, 3);
+    let prompt = `「${term.meaning}」的英文是什麼？`;
+    let options = [term.english, ...distractorTerms.map((item) => item.english)];
+    let speech = "";
+    if (type === "listen") {
+      prompt = "聽一聽，選出正確單字。";
+      speech = term.english;
+    } else if (type === "spell") {
+      prompt = `選出「${term.meaning}」的正確拼字。`;
+      const spellingOptions = spellingDistractors(term.english);
+      options = [term.english, ...spellingOptions, ...distractorTerms.map((item) => item.english)].slice(0, 4);
+    } else if (type === "read") {
+      prompt = `Which word means「${term.meaning}」?`;
+    } else if (type === "speak") {
+      prompt = `看提示選出正確英文，並跟著說：「${term.meaning}」`;
+      speech = term.english;
+    }
+    return {
+      visual: { listen: "🎧", spell: "✏️", read: "📖", speak: "🎙️" }[type] || "💎",
+      prompt,
+      options,
+      answer: 0,
+      speech,
+    };
+  });
+}
+
 function emptyMaterialQuestion() {
   return {
     visual: "📝",
@@ -1163,13 +1327,28 @@ function renderMaterialEditor(material = null) {
             <div class="field full">
               <div class="question-editor-heading">
                 <div><label>教材題目</label><small class="field-help">逐題填寫，最多 20 題；可拖曳概念改用上下按鈕調整順序。</small></div>
-                <div><button class="secondary-btn" id="open-batch-import" type="button">批次匯入</button><button class="primary-btn" id="add-question" type="button">＋ 新增題目</button></div>
+                <div><button class="ai-btn" id="open-ai-generator" type="button">✦ 智慧命題</button><button class="secondary-btn" id="open-batch-import" type="button">試算表批次匯入</button><button class="primary-btn" id="add-question" type="button">＋ 逐題新增</button></div>
               </div>
               <div class="question-editor-list" id="question-editor-list">${renderQuestionEditorList(material?.questions || [])}</div>
             </div>
           </div>
           <div class="editor-actions"><button class="ghost-btn close-material-editor" type="button">取消</button><button class="secondary-btn" id="save-material" name="saveIntent" value="save" type="submit">儲存教材</button><button class="primary-btn" id="publish-and-assign" name="saveIntent" value="assign" type="submit">發布並前往指派</button></div>
         </form>
+      </article>
+    </div>
+    <div class="game-modal batch-import-modal hidden" id="ai-generator-modal">
+      <article class="game-card batch-import-card">
+        <header><div><span class="mission-tag">智慧題目助手</span><h2>從授課資料快速產生題目</h2></div><button class="ghost-btn" id="close-ai-generator" type="button">✕</button></header>
+        <div class="ai-generator-intro"><b>1. 上傳或貼上授課資料</b><p>目前支援 TXT、CSV，或每行輸入一組「英文、中文」，例如：apple, 蘋果。</p></div>
+        <label class="secondary-btn teaching-file-button">上傳授課資料<input id="teaching-material-file" type="file" accept=".txt,.csv,text/plain,text/csv" /></label>
+        <small id="teaching-file-status" class="field-help">也可以直接貼到下方文字框</small>
+        <textarea class="question-source" id="teaching-material-source" rows="9" placeholder="apple, 蘋果&#10;banana, 香蕉&#10;orange, 柳橙&#10;grape, 葡萄"></textarea>
+        <div class="form-grid ai-generator-options">
+          <div class="field"><label>選擇題型</label><select id="ai-question-type"><option value="word">單字辨識</option><option value="listen">聽力理解</option><option value="read">閱讀理解</option><option value="spell">拼字工藝</option><option value="speak">口說跟讀</option></select></div>
+          <div class="field"><label>產生題數</label><select id="ai-question-count"><option>5</option><option selected>10</option><option>15</option><option>20</option></select></div>
+        </div>
+        <div class="ai-generator-note">系統會先產生題目草稿，教師仍可逐題修改答案、選項及語音內容後再發布。</div>
+        <div class="editor-actions"><button class="ghost-btn" id="cancel-ai-generator" type="button">取消</button><button class="primary-btn" id="generate-ai-questions" type="button">分析教材並產生題目</button></div>
       </article>
     </div>
     <div class="game-modal batch-import-modal hidden" id="batch-import-modal">
@@ -1188,10 +1367,10 @@ function renderMaterialEditor(material = null) {
           </section>
           <section class="import-method">
             <span class="import-step">Google</span>
-            <h3>使用 Google 試算表</h3>
-            <p>下載左側範例後，上傳到 Google 試算表編輯。完成時選「檔案 → 下載 → CSV」，再回到左側選擇檔案。</p>
-            <a class="secondary-btn" href="https://sheets.new" target="_blank" rel="noopener">開啟 Google 試算表</a>
-            <small>若使用 Google 表單收集題目，請先將回覆連到試算表，再下載 CSV 上傳。</small>
+            <h3>直接讀取 Google 試算表</h3>
+            <p>使用 WonderGo 範例欄位建立試算表，設為「知道連結的使用者可查看」，再貼上分享網址。</p>
+            <div class="google-sheet-import"><input id="google-sheet-url" type="url" placeholder="貼上 Google 試算表分享網址" /><button class="secondary-btn" id="read-google-sheet" type="button">讀取題目</button></div>
+            <small>Google 表單回覆也可先連結試算表，再用此方式讀取。</small>
           </section>
         </div>
         <details class="paste-import-details">
@@ -1242,6 +1421,8 @@ function renderAssignmentManager(user) {
 
 function renderAssignmentEditor(user, targetStudentId = "") {
   const materials = teacherContent.materials.filter((item) => item.status === "published");
+  const assignmentStudents = activeStudents();
+  const assignmentClass = selectedTeacherClass();
   const initialMode = targetStudentId ? "individual" : "class";
   return `
     <div class="game-modal admin-edit-modal" id="assignment-editor-modal">
@@ -1261,12 +1442,12 @@ function renderAssignmentEditor(user, targetStudentId = "") {
             </div>
             <div class="field full assignment-target-panel ${initialMode === "individual" ? "" : "hidden"}" data-target-panel="individual">
               <label>選擇一位學生</label>
-              <select name="individualStudentId">${cloudStudents.map((student) => `<option value="${student.id}" ${student.id === targetStudentId ? "selected" : ""}>${escapeHTML(student.name)}（${escapeHTML(student.seat)}號）</option>`).join("")}</select>
+              <select name="individualStudentId">${assignmentStudents.map((student) => `<option value="${student.id}" ${student.id === targetStudentId ? "selected" : ""}>${escapeHTML(student.name)}（${escapeHTML(student.seat)}號）</option>`).join("")}</select>
             </div>
             <div class="field full assignment-target-panel hidden" data-target-panel="group">
               <label>勾選小組成員</label>
               <div class="group-student-picker">
-                ${cloudStudents.map((student) => `
+                ${assignmentStudents.map((student) => `
                   <label>
                     <input type="checkbox" name="groupStudentId" value="${student.id}" />
                     <span><b>${escapeHTML(student.name)}</b><small>${escapeHTML(student.seat)}號・${escapeHTML(student.level)}</small></span>
@@ -1278,8 +1459,8 @@ function renderAssignmentEditor(user, targetStudentId = "") {
             <div class="field"><label>完成獎勵 XP</label><input name="xpReward" type="number" min="10" max="200" value="50" required /></div>
             <div class="field full"><label>任務說明</label><textarea name="instructions" rows="3" placeholder="例：完成後請複習答錯的單字。"></textarea></div>
           </div>
-          <input type="hidden" name="school" value="${escapeHTML(user.school)}" />
-          <input type="hidden" name="className" value="${escapeHTML(user.className)}" />
+          <input type="hidden" name="school" value="${escapeHTML(assignmentClass?.school || user.school)}" />
+          <input type="hidden" name="className" value="${escapeHTML(assignmentClass?.className || user.className)}" />
           <div class="editor-actions"><button class="ghost-btn close-assignment-editor" type="button">取消</button><button class="primary-btn" id="save-assignment" type="submit">送出指派</button></div>
         </form>
       </article>
@@ -1431,6 +1612,7 @@ function renderAdminAnalytics(user) {
 
 function renderTeacherOverview(user) {
   const students = activeStudents();
+  const classroom = selectedTeacherClass();
   const activeCount = students.filter((student) => student.days > 0).length;
   const averageCompletion = students.length
     ? Math.round(students.reduce((sum, student) => sum + student.completion, 0) / students.length)
@@ -1439,7 +1621,7 @@ function renderTeacherOverview(user) {
     ? Math.round(students.reduce((sum, student) => sum + (student.abilities?.[index] || 0), 0) / students.length)
     : 0);
   const attentionStudents = students.filter((student) => student.status === "需要關注");
-  const errorAnalysis = staffDashboard?.errorAnalysis || {};
+  const errorAnalysis = classroom?.errorAnalysis || staffDashboard?.errorAnalysis || {};
   return `
     ${teacherHeader(user, "班級學習總覽", "本週整體使用與學習狀況")}
     <section class="metric-grid">
@@ -1463,13 +1645,18 @@ function renderTeacherOverview(user) {
 function renderErrorAnalysis(analysis = {}) {
   const types = analysis.types || [];
   const vocabulary = analysis.vocabulary || [];
+  const concepts = analysis.concepts || [];
   return `
     <section class="error-analysis">
       <div class="section-title"><div><h2>班級易錯內容</h2><p>依本週每題實際作答紀錄統計</p></div></div>
-      <div class="error-grid">
+      <div class="error-grid error-grid-three">
         <article class="card panel">
           <h3>易錯題型</h3>
           ${types.length ? types.map((item, index) => `<div class="error-rank"><b>${index + 1}</b><span>${escapeHTML(item.label)}</span><em>${item.count} 次答錯</em></div>`).join("") : '<p class="empty-hint">尚未累積逐題錯題紀錄，學生完成新版任務後會自動呈現。</p>'}
+        </article>
+        <article class="card panel">
+          <h3>易混淆觀念／題目</h3>
+          ${concepts.length ? concepts.map((item, index) => `<div class="error-rank"><b>${index + 1}</b><span>${escapeHTML(item.label)}</span><em>${item.count} 次答錯</em></div>`).join("") : '<p class="empty-hint">目前沒有反覆出錯的觀念。</p>'}
         </article>
         <article class="card panel">
           <h3>易錯單字／答案</h3>
@@ -1491,27 +1678,91 @@ function studentTable() {
     </article>`;
 }
 
+function summarizeStudentErrors(student) {
+  const wrong = (student?.attempts || []).filter((attempt) => !attempt.is_correct);
+  const count = (getLabel) => {
+    const values = new Map();
+    wrong.forEach((attempt) => {
+      const label = getLabel(attempt);
+      if (label) values.set(label, (values.get(label) || 0) + 1);
+    });
+    return [...values.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([label, total]) => ({ label, count: total }));
+  };
+  return {
+    types: count((attempt) => attempt.question_type),
+    vocabulary: count((attempt) => attempt.vocabulary || attempt.correct_answer),
+    concepts: count((attempt) => attempt.prompt
+      ? `${attempt.prompt}｜誤選：${attempt.selected_answer || "未作答"}`
+      : ""),
+  };
+}
+
+function renderLearningErrorCards(analysis, scopeLabel) {
+  const sections = [
+    ["不熟悉題型", analysis.types || [], "目前沒有重複答錯的題型。"],
+    ["易混淆觀念／題目", analysis.concepts || [], "目前沒有反覆出錯的觀念。"],
+    ["易錯單字／答案", analysis.vocabulary || [], "目前沒有易錯單字紀錄。"],
+  ];
+  return `
+    <section class="student-error-section">
+      <div class="section-title"><div><h2>${escapeHTML(scopeLabel)}學習診斷</h2><p>依本週實際答錯紀錄整理，可直接作為補強任務依據。</p></div></div>
+      <div class="student-error-grid">
+        ${sections.map(([title, items, empty]) => `
+          <article class="card panel">
+            <h3>${title}</h3>
+            ${items.length ? items.map((item, index) => `<div class="error-rank"><b>${index + 1}</b><span>${escapeHTML(item.label)}</span><em>${item.count} 次</em></div>`).join("") : `<p class="empty-hint">${empty}</p>`}
+          </article>`).join("")}
+      </div>
+    </section>`;
+}
+
 function renderStudents(user) {
   const students = activeStudents();
-  const s = students[selectedStudent] || students[0];
-  if (!s) {
-    return `
-      ${teacherHeader(user, "學生學習狀況", "挑選個別使用者，查看完整學習分析")}
-      <section class="card empty-page"><div><div class="big-icon">♙</div><h2>目前班級尚無玩家</h2><p style="color:var(--muted)">玩家使用相同學校與班級完成註冊後，就會出現在這裡。</p></div></section>`;
-  }
-  const studentAbilities = s.abilities || [0, 0, 0, 0, 0];
+  const classes = teacherClasses();
+  const classroom = selectedTeacherClass();
+  const s = selectedStudent >= 0 ? students[selectedStudent] : null;
+  const classAbilities = classroom?.abilities || [0, 0, 0, 0, 0];
+  const activeCount = students.filter((student) => student.days > 0).length;
+  const averageScore = students.length
+    ? Math.round(students.reduce((sum, student) => sum + (student.averageScore || 0), 0) / students.length)
+    : 0;
+  const studentAbilities = s?.abilities || [0, 0, 0, 0, 0];
   return `
-    ${teacherHeader(user, "學生學習狀況", "挑選個別使用者，查看完整學習分析")}
-    <section class="teacher-layout">
-      ${studentTable()}
-      <article class="card panel student-detail">
-        <header><span class="avatar">${s.name[0]}</span><div><h3>${s.name}</h3><p>${s.player}｜${s.level}</p></div></header>
-        <div class="detail-stat"><label><span>本週任務完成率</span><b>${s.completion}%</b></label><div class="bar"><span style="width:${s.completion}%"></span></div></div>
-        ${abilities.map((a, i) => `<div class="detail-stat"><label><span>${a.shortName}</span><b>${studentAbilities[i]}</b></label><div class="bar"><span style="width:${studentAbilities[i]}%;background:${a.color}"></span></div></div>`).join("")}
-        <div class="insight ${s.status.includes("關注") ? "focus" : "good"}"><span>✦</span><div><b>系統建議</b><p>${s.status.includes("關注") ? `優先安排「${s.focus}」，以 5 分鐘短任務協助恢復節奏。` : `學習節奏穩定，可安排「${s.focus}」延伸任務。`}</p></div></div>
-        <button class="primary-btn mission-action" data-target-student="${s.id || ""}">為 ${s.name.slice(1)} 指派任務</button>
-      </article>
-    </section>`;
+    ${teacherHeader(user, "學生學習狀況", "先挑選班級，再查看全班或個別學生學習分析")}
+    <section class="card learning-filter-bar">
+      <div class="field"><label>挑選班級</label><select id="learning-class-filter">${classes.map((item) => `<option value="${escapeHTML(item.key)}" ${item.key === classroom?.key ? "selected" : ""}>${escapeHTML(item.school)}・${escapeHTML(item.className)}</option>`).join("")}</select></div>
+      <div class="field"><label>挑選學生</label><select id="learning-student-filter"><option value="-1">查看全班學習狀況</option>${students.map((student, index) => `<option value="${index}" ${index === selectedStudent ? "selected" : ""}>${escapeHTML(student.name)}（${escapeHTML(student.seat)}號）</option>`).join("")}</select></div>
+    </section>
+    ${!students.length ? `
+      <section class="card empty-page"><div><div class="big-icon">♙</div><h2>此班級目前沒有學生</h2><p style="color:var(--muted)">學生使用相同學校與班級註冊後，就會出現在這裡。</p></div></section>
+    ` : s ? `
+      <section class="teacher-layout student-learning-layout">
+        ${studentTable()}
+        <article class="card panel student-detail">
+          <header><span class="avatar">${escapeHTML(s.name[0])}</span><div><h3>${escapeHTML(s.name)}</h3><p>${escapeHTML(s.player)}｜${escapeHTML(s.level)}</p></div></header>
+          <div class="detail-stat"><label><span>本週任務完成率</span><b>${s.completion}%</b></label><div class="bar"><span style="width:${s.completion}%"></span></div></div>
+          ${abilities.map((ability, index) => `<div class="detail-stat"><label><span>${ability.shortName}</span><b>${studentAbilities[index]}</b></label><div class="bar"><span style="width:${studentAbilities[index]}%;background:${ability.color}"></span></div></div>`).join("")}
+          <div class="insight ${s.status.includes("關注") ? "focus" : "good"}"><span>✦</span><div><b>系統建議</b><p>${s.status.includes("關注") ? `優先安排「${s.focus}」，以短任務協助補強。` : `學習節奏穩定，可安排「${s.focus}」延伸任務。`}</p></div></div>
+          <button class="primary-btn mission-action" data-target-student="${s.id || ""}">為學生指派任務</button>
+        </article>
+      </section>
+      ${renderLearningErrorCards(summarizeStudentErrors(s), `${s.name}的`)}
+    ` : `
+      <section class="metric-grid">
+        <article class="card metric"><span>班級學生</span><strong>${students.length} 人</strong><small>本週活躍 ${activeCount} 人</small></article>
+        <article class="card metric"><span>平均答題表現</span><strong>${averageScore} 分</strong><small>依本週學習紀錄</small></article>
+        <article class="card metric"><span>需要關注</span><strong>${students.filter((student) => student.status === "需要關注").length} 人</strong><small>可安排補強任務</small></article>
+      </section>
+      <div class="section-title"><div><h2>${escapeHTML(classroom?.className || "班級")}五大能力</h2><p>全班目前能力平均</p></div></div>
+      <section class="training-grid">
+        ${abilities.map((ability, index) => `<article class="training-card" style="color:${ability.color}"><span class="ability-icon" style="background:${ability.color}">${ability.icon}</span><h3>${ability.shortName}</h3><div class="mini-progress"><span style="width:${classAbilities[index]}%"></span></div><footer><span>${classAbilities[index]} 分</span><span>${students.length} 人</span></footer></article>`).join("")}
+      </section>
+      <div class="teacher-layout" style="margin-top:20px">${studentTable()}<article class="card panel"><h2 class="card-title">班級觀察</h2><p>從左側選擇學生，可查看個人能力、易錯題型、混淆觀念與單字。</p></article></div>
+      ${renderErrorAnalysis(classroom?.errorAnalysis || {})}
+    `}`;
 }
 
 function renderTeacherPlaceholder(user, title, body, icon) {
@@ -1786,9 +2037,12 @@ function renderGameCard() {
   if (gameState.index >= gameState.questions.length) {
     const isAssignment = gameState.mode === "assignment";
     const baseXp = isAssignment ? gameState.baseXp : 20 + gameState.correct * 5;
+    const assignmentXp = isAssignment
+      ? Math.floor(baseXp * (gameState.correct / gameState.questions.length))
+      : baseXp;
     const user = currentUser();
     const completionCount = isAssignment ? 0 : getLocalDailyTaskCount(user, gameState.taskKey);
-    const expectedXp = isAssignment ? baseXp : calculateAwardedXp(baseXp, completionCount);
+    const expectedXp = isAssignment ? assignmentXp : calculateAwardedXp(baseXp, completionCount);
     return `
       <article class="game-card result-card">
         <div class="result-burst">🏆</div>
@@ -1796,6 +2050,7 @@ function renderGameCard() {
         <h2>${gameState.title}過關！</h2>
         <p>你完成了 ${gameState.questions.length} 題練習，答對 <strong>${gameState.correct}</strong> 題。</p>
         <div class="result-xp">＋${expectedXp} XP</div>
+        ${isAssignment ? '<p class="repeat-xp-note">教師任務依答對比例發放經驗值，答錯題不會獲得 XP。</p>' : ""}
         ${!isAssignment && completionCount >= 1 ? '<p class="repeat-xp-note">今日重複挑戰：本次經驗值折半</p>' : ""}
         <button class="primary-btn wide" id="claim-result">領取經驗值</button>
       </article>`;
@@ -1868,7 +2123,10 @@ async function claimGameResult() {
   }
   const user = currentUser();
   const isAssignment = gameState.mode === "assignment";
-  const baseXp = isAssignment ? gameState.baseXp : 20 + gameState.correct * 5;
+  const assignmentXp = Math.floor(
+    (gameState.baseXp || 0) * (gameState.correct / gameState.questions.length),
+  );
+  const baseXp = isAssignment ? assignmentXp : 20 + gameState.correct * 5;
   const score = Math.round((gameState.correct / gameState.questions.length) * 100);
 
   try {
@@ -1973,6 +2231,7 @@ function bindGameModalEvents() {
 
 function closeMaterialEditor() {
   document.getElementById("material-editor-modal")?.remove();
+  document.getElementById("ai-generator-modal")?.remove();
   document.getElementById("batch-import-modal")?.remove();
 }
 
@@ -2024,6 +2283,38 @@ function bindMaterialEditorEvents() {
   });
   const batchModal = document.getElementById("batch-import-modal");
   const closeBatchImport = () => batchModal?.classList.add("hidden");
+  const aiModal = document.getElementById("ai-generator-modal");
+  const closeAiGenerator = () => aiModal?.classList.add("hidden");
+  document.getElementById("open-ai-generator")?.addEventListener("click", () => {
+    aiModal?.classList.remove("hidden");
+  });
+  document.getElementById("close-ai-generator")?.addEventListener("click", closeAiGenerator);
+  document.getElementById("cancel-ai-generator")?.addEventListener("click", closeAiGenerator);
+  document.getElementById("teaching-material-file")?.addEventListener("change", async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const status = document.getElementById("teaching-file-status");
+    try {
+      document.getElementById("teaching-material-source").value = await file.text();
+      if (status) status.textContent = `已讀取 ${file.name}，請選擇題型後產生題目。`;
+    } catch {
+      if (status) status.textContent = "檔案讀取失敗，請改用 TXT 或 CSV。";
+    }
+  });
+  document.getElementById("generate-ai-questions")?.addEventListener("click", () => {
+    try {
+      const questions = generateQuestionsFromTeachingText(
+        document.getElementById("teaching-material-source").value,
+        document.getElementById("ai-question-type").value,
+        document.getElementById("ai-question-count").value,
+      );
+      refreshQuestionCards(questions);
+      closeAiGenerator();
+      toast(`已產生 ${questions.length} 題草稿，請逐題確認後發布。`);
+    } catch (error) {
+      toast(error.message);
+    }
+  });
   document.getElementById("open-batch-import")?.addEventListener("click", () => {
     document.getElementById("batch-question-source").value =
       questionsToText(currentQuestionDrafts());
@@ -2044,6 +2335,23 @@ function bindMaterialEditorEvents() {
       toast(`已從 CSV 匯入 ${questions.length} 題，請確認內容後儲存。`);
     } catch (error) {
       if (status) status.textContent = "匯入失敗，請檢查檔案格式";
+      toast(error.message);
+    }
+  });
+  document.getElementById("read-google-sheet")?.addEventListener("click", async (event) => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    button.textContent = "讀取中...";
+    try {
+      const questions = parseMaterialCsv(
+        await loadPublicGoogleSheet(document.getElementById("google-sheet-url").value),
+      );
+      refreshQuestionCards(questions);
+      closeBatchImport();
+      toast(`已從 Google 試算表匯入 ${questions.length} 題。`);
+    } catch (error) {
+      button.disabled = false;
+      button.textContent = "重新讀取";
       toast(error.message);
     }
   });
@@ -2409,6 +2717,17 @@ function bindEvents() {
     currentPage = "students";
     render();
   }));
+
+  document.getElementById("learning-class-filter")?.addEventListener("change", (event) => {
+    selectedClassKey = event.target.value;
+    selectedStudent = -1;
+    render();
+  });
+
+  document.getElementById("learning-student-filter")?.addEventListener("change", (event) => {
+    selectedStudent = Number(event.target.value);
+    render();
+  });
 
   document.querySelectorAll(".mission-action").forEach((button) => button.addEventListener("click", () => {
     if (currentUser()?.role === "teacher" && teacherContent.materials.some((item) => item.status === "published")) {

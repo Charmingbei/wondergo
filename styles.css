@@ -2076,6 +2076,17 @@ button {
   margin: 12px 0 8px;
 }
 
+.google-sheet-import {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0 8px;
+}
+
+.google-sheet-import input {
+  min-width: 0;
+  flex: 1;
+}
+
 .file-upload-button {
   cursor: pointer;
 }
@@ -2372,6 +2383,32 @@ button {
   gap: 20px;
 }
 
+.learning-filter-bar {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+  padding: 18px;
+}
+
+.learning-filter-bar .field {
+  margin: 0;
+}
+
+.home-ability-section {
+  margin-top: 30px;
+}
+
+.student-error-section {
+  margin-top: 24px;
+}
+
+.student-error-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
 .pending-panel {
   margin-top: 20px;
   border-color: #f3d7a4;
@@ -2524,6 +2561,57 @@ button {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 18px;
+}
+
+.error-grid.error-grid-three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.ai-btn {
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 12px;
+  color: #fff;
+  background: linear-gradient(135deg, #5639d8, #9b5de5);
+  font-weight: 900;
+  box-shadow: 0 6px 16px rgba(86, 57, 216, 0.22);
+}
+
+.teaching-file-button {
+  display: inline-flex;
+  margin: 4px 0 8px;
+  cursor: pointer;
+}
+
+.teaching-file-button input {
+  display: none;
+}
+
+.ai-generator-intro {
+  padding: 13px 15px;
+  border-radius: 14px;
+  background: #f5f2ff;
+}
+
+.ai-generator-intro p,
+.ai-generator-note {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.ai-generator-intro p {
+  margin: 5px 0 0;
+}
+
+.ai-generator-options {
+  margin-top: 12px;
+}
+
+.ai-generator-note {
+  padding: 11px 13px;
+  border-radius: 12px;
+  background: #fff8e8;
 }
 
 .error-rank {
@@ -2922,6 +3010,23 @@ td {
   }
 
   .import-method-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .google-sheet-import {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .learning-filter-bar,
+  .student-error-grid,
+  .error-grid.error-grid-three {
+    grid-template-columns: 1fr;
+  }
+
+  .question-editor-heading,
+  .question-editor-heading > div:last-child {
     align-items: stretch;
     flex-direction: column;
   }

@@ -334,7 +334,7 @@ const Cloud = (() => {
       request("/rest/v1/profiles?select=id,role,account,school,class_name,seat,real_name,display_name,contact_email,password_changed_at,xp,adventure_level,cefr_level,is_approved,created_at&order=created_at.desc"),
       request("/rest/v1/ability_progress?select=*"),
       request(`/rest/v1/learning_events?created_at=gte.${since}&select=user_id,ability,score,xp_earned,duration_seconds,created_at&order=created_at.desc`),
-      request(`/rest/v1/question_attempts?created_at=gte.${since}&select=user_id,ability,question_type,vocabulary,prompt,is_correct,created_at&order=created_at.desc`),
+      request(`/rest/v1/question_attempts?created_at=gte.${since}&select=user_id,ability,question_type,vocabulary,prompt,selected_answer,correct_answer,is_correct,created_at&order=created_at.desc`),
     ]);
     const progressByUser = new Map(progress.map((item) => [item.user_id, item]));
     const eventsByUser = groupBy(events, "user_id");
@@ -453,6 +453,7 @@ const Cloud = (() => {
       wrongCount: wrong.length,
       types: countValues("question_type"),
       vocabulary: countValues("vocabulary"),
+      concepts: countValues("prompt"),
     };
   }
 
