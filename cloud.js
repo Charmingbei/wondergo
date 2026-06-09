@@ -523,6 +523,18 @@ const Cloud = (() => {
     return mapMaterial(rows[0]);
   }
 
+  async function publishMaterial(materialId) {
+    const rows = await request(`/rest/v1/learning_materials?id=eq.${materialId}`, {
+      method: "PATCH",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify({
+        status: "published",
+        updated_at: new Date().toISOString(),
+      }),
+    });
+    return mapMaterial(rows[0]);
+  }
+
   async function createAssignments(values) {
     const session = getSession();
     const studentIds = values.studentIds?.length ? values.studentIds : [null];
@@ -716,6 +728,7 @@ const Cloud = (() => {
     updateUserAsAdmin,
     loadTeacherContent,
     saveMaterial,
+    publishMaterial,
     archiveMaterial,
     createAssignments,
     deleteAssignment,

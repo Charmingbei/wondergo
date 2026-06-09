@@ -957,6 +957,7 @@ function renderMaterialManager(user) {
               <div class="material-meta"><span>${material.questions.length} 題</span><span>更新 ${new Date(material.updatedAt).toLocaleDateString("zh-TW")}</span></div>
               <footer>
                 <button class="secondary-btn edit-material" data-material="${material.id}">編輯教材</button>
+                ${material.status === "draft" ? `<button class="primary-btn publish-material" data-material="${material.id}">發布並指派</button>` : ""}
                 ${material.status !== "archived" ? `<button class="ghost-btn archive-material" data-material="${material.id}">封存</button>` : ""}
               </footer>
             </article>`;
@@ -994,6 +995,81 @@ function parseMaterialQuestions(text) {
       speech: parts[6] || "",
     };
   });
+}
+
+function parseCsvRows(text) {
+  const rows = [];
+  let row = [];
+  let field = "";
+  let quoted = false;
+  const source = text.replace(/^\uFEFF/, "");
+  for (let index = 0; index < source.length; index += 1) {
+    const character = source[index];
+    if (character === '"') {
+      if (quoted && source[index + 1] === '"') {
+        field += '"';
+        index += 1;
+      } else {
+        quoted = !quoted;
+      }
+    } else if (character === "," && !quoted) {
+      row.push(field.trim());
+      field = "";
+    } else if ((character === "\n" || character === "\r") && !quoted) {
+      if (character === "\r" && source[index + 1] === "\n") index += 1;
+      row.push(field.trim());
+      if (row.some(Boolean)) rows.push(row);
+      row = [];
+      field = "";
+    } else {
+      field += character;
+    }
+  }
+  row.push(field.trim());
+  if (row.some(Boolean)) rows.push(row);
+  return rows;
+}
+
+function parseMaterialCsv(text) {
+  const rows = parseCsvRows(text);
+  if (rows.length < 2) throw new Error("CSV 內沒有題目，請先下載範例檔確認格式。");
+  const headers = rows[0].map((header) => header.toLowerCase().replace(/\s/g, ""));
+  const findColumn = (...names) => headers.findIndex((header) =>
+    names.some((name) => header === name.toLowerCase().replace(/\s/g, "")));
+  const columns = {
+    visual: findColumn("圖片", "圖片/emoji", "visual"),
+    prompt: findColumn("題目", "prompt"),
+    correct: findColumn("正確答案", "correctanswer", "answer"),
+    option2: findColumn("選項2", "option2"),
+    option3: findColumn("選項3", "option3"),
+    option4: findColumn("選項4", "option4"),
+    speech: findColumn("播放語音", "speech"),
+  };
+  if ([columns.prompt, columns.correct, columns.option2, columns.option3, columns.option4].some((index) => index < 0)) {
+    throw new Error("CSV 欄位不完整，請使用 WonderGo 範例檔。");
+  }
+  const questions = rows.slice(1).filter((row) => row.some(Boolean)).map((row, index) => {
+    const value = (column) => column >= 0 ? (row[column] || "").trim() : "";
+    const options = [
+      value(columns.correct),
+      value(columns.option2),
+      value(columns.option3),
+      value(columns.option4),
+    ];
+    if (!value(columns.prompt) || options.some((option) => !option)) {
+      throw new Error(`CSV 第 ${index + 2} 列不完整，請確認題目與四個答案。`);
+    }
+    return {
+      visual: value(columns.visual) || "📝",
+      prompt: value(columns.prompt),
+      options,
+      answer: 0,
+      speech: value(columns.speech),
+    };
+  });
+  if (!questions.length) throw new Error("CSV 內沒有可匯入的題目。");
+  if (questions.length > 20) throw new Error("每份教材最多 20 題，請分成不同教材匯入。");
+  return questions;
 }
 
 function emptyMaterialQuestion() {
@@ -1083,7 +1159,7 @@ function renderMaterialEditor(material = null) {
             <div class="field full"><label>教材說明</label><textarea name="description" rows="2" placeholder="說明本教材的學習目標">${escapeHTML(material?.description || "")}</textarea></div>
             <div class="field"><label>五大能力</label><select name="ability">${abilities.map((ability) => `<option value="${ability.id}" ${material?.ability === ability.id ? "selected" : ""}>${ability.shortName}</option>`).join("")}</select></div>
             <div class="field"><label>適用程度</label><select name="cefrLevel">${["Pre-A1", "A1", "A2", "B1", "B2"].map((level) => `<option ${material?.cefrLevel === level ? "selected" : ""}>${level}</option>`).join("")}</select></div>
-            <div class="field full"><label>發布狀態</label><select name="status"><option value="draft" ${material?.status === "draft" ? "selected" : ""}>草稿</option><option value="published" ${material?.status === "published" ? "selected" : ""}>發布，可供指派</option><option value="archived" ${material?.status === "archived" ? "selected" : ""}>封存</option></select></div>
+            <div class="field full"><label>發布狀態</label><select name="status"><option value="draft" ${material?.status === "draft" ? "selected" : ""}>草稿</option><option value="published" ${!material || material.status === "published" ? "selected" : ""}>發布，可供指派</option><option value="archived" ${material?.status === "archived" ? "selected" : ""}>封存</option></select></div>
             <div class="field full">
               <div class="question-editor-heading">
                 <div><label>教材題目</label><small class="field-help">逐題填寫，最多 20 題；可拖曳概念改用上下按鈕調整順序。</small></div>
@@ -1092,16 +1168,38 @@ function renderMaterialEditor(material = null) {
               <div class="question-editor-list" id="question-editor-list">${renderQuestionEditorList(material?.questions || [])}</div>
             </div>
           </div>
-          <div class="editor-actions"><button class="ghost-btn close-material-editor" type="button">取消</button><button class="primary-btn" id="save-material" type="submit">儲存教材</button></div>
+          <div class="editor-actions"><button class="ghost-btn close-material-editor" type="button">取消</button><button class="secondary-btn" id="save-material" name="saveIntent" value="save" type="submit">儲存教材</button><button class="primary-btn" id="publish-and-assign" name="saveIntent" value="assign" type="submit">發布並前往指派</button></div>
         </form>
       </article>
     </div>
     <div class="game-modal batch-import-modal hidden" id="batch-import-modal">
       <article class="game-card batch-import-card">
-        <header><div><span class="mission-tag">快速匯入</span><h2>一次貼上多題</h2></div><button class="ghost-btn" id="close-batch-import" type="button">✕</button></header>
-        <p>每行一題，使用直線「｜」或鍵盤的「|」分隔欄位。</p>
-        <textarea class="question-source" id="batch-question-source" rows="10" placeholder="${escapeHTML(sample)}">${escapeHTML(material ? questionsToText(material.questions) : "")}</textarea>
-        <small class="field-help">格式：圖片｜題目｜正確答案｜選項2｜選項3｜選項4｜播放語音（選填）</small>
+        <header><div><span class="mission-tag">快速匯入</span><h2>選擇最方便的上傳方式</h2></div><button class="ghost-btn" id="close-batch-import" type="button">✕</button></header>
+        <div class="import-method-grid">
+          <section class="import-method featured">
+            <span class="import-step">推薦</span>
+            <h3>上傳範例檔</h3>
+            <p>先下載 CSV 範例，在 Excel 或 Google 試算表填寫後上傳。</p>
+            <div class="import-method-actions">
+              <a class="secondary-btn" href="assets/wondergo-question-template.csv" download>1. 下載範例 CSV</a>
+              <label class="primary-btn file-upload-button">2. 選擇 CSV<input id="question-file-input" type="file" accept=".csv,text/csv" /></label>
+            </div>
+            <small id="question-file-status">尚未選擇檔案</small>
+          </section>
+          <section class="import-method">
+            <span class="import-step">Google</span>
+            <h3>使用 Google 試算表</h3>
+            <p>下載左側範例後，上傳到 Google 試算表編輯。完成時選「檔案 → 下載 → CSV」，再回到左側選擇檔案。</p>
+            <a class="secondary-btn" href="https://sheets.new" target="_blank" rel="noopener">開啟 Google 試算表</a>
+            <small>若使用 Google 表單收集題目，請先將回覆連到試算表，再下載 CSV 上傳。</small>
+          </section>
+        </div>
+        <details class="paste-import-details">
+          <summary>或直接貼上多題文字</summary>
+          <p>每行一題，使用直線「｜」或鍵盤的「|」分隔欄位。</p>
+          <textarea class="question-source" id="batch-question-source" rows="10" placeholder="${escapeHTML(sample)}">${escapeHTML(material ? questionsToText(material.questions) : "")}</textarea>
+          <small class="field-help">格式：圖片｜題目｜正確答案｜選項2｜選項3｜選項4｜播放語音（選填）</small>
+        </details>
         <div class="editor-actions"><button class="ghost-btn" id="cancel-batch-import" type="button">取消</button><button class="primary-btn" id="apply-batch-import" type="button">轉成題目卡片</button></div>
       </article>
     </div>`;
@@ -1109,6 +1207,7 @@ function renderMaterialEditor(material = null) {
 
 function renderAssignmentManager(user) {
   const materials = teacherContent.materials.filter((item) => item.status === "published");
+  const drafts = teacherContent.materials.filter((item) => item.status === "draft");
   const assignments = teacherContent.assignments || [];
   return `
     ${teacherHeader(user, "指派任務", "將已發布教材指派給全班、個別學生或自選小組")}
@@ -1121,7 +1220,7 @@ function renderAssignmentManager(user) {
       <div><h2>班級任務</h2><p>可指派全班、單一學生，或勾選多位學生組成這次任務小組。</p></div>
       <button class="primary-btn open-assignment-editor" ${materials.length ? "" : "disabled"}>＋ 指派任務</button>
     </div>
-    ${materials.length ? "" : '<div class="insight focus"><span>!</span><div><b>請先發布教材</b><p>前往教材管理建立題組，狀態設為「發布」後即可指派。</p></div></div>'}
+    ${materials.length ? "" : `<div class="insight focus"><span>!</span><div><b>${drafts.length ? `已有 ${drafts.length} 份草稿教材，尚未發布` : "請先建立教材"}</b><p>教材必須發布後才能指派給學生。</p><button class="secondary-btn go-material-manager">前往教材管理發布</button></div></div>`}
     <section class="assignment-list">
       ${assignments.length ? assignments.map((assignment) => {
         const material = teacherContent.materials.find((item) => item.id === assignment.materialId);
@@ -1932,6 +2031,22 @@ function bindMaterialEditorEvents() {
   });
   document.getElementById("close-batch-import")?.addEventListener("click", closeBatchImport);
   document.getElementById("cancel-batch-import")?.addEventListener("click", closeBatchImport);
+  document.getElementById("question-file-input")?.addEventListener("change", async (event) => {
+    const file = event.target.files?.[0];
+    const status = document.getElementById("question-file-status");
+    if (!file) return;
+    if (status) status.textContent = `正在讀取 ${file.name}...`;
+    try {
+      const questions = parseMaterialCsv(await file.text());
+      refreshQuestionCards(questions);
+      if (status) status.textContent = `已匯入 ${file.name}，共 ${questions.length} 題`;
+      closeBatchImport();
+      toast(`已從 CSV 匯入 ${questions.length} 題，請確認內容後儲存。`);
+    } catch (error) {
+      if (status) status.textContent = "匯入失敗，請檢查檔案格式";
+      toast(error.message);
+    }
+  });
   document.getElementById("apply-batch-import")?.addEventListener("click", () => {
     try {
       const questions = parseMaterialQuestions(
@@ -1947,7 +2062,8 @@ function bindMaterialEditorEvents() {
   document.getElementById("material-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const button = document.getElementById("save-material");
+    const intent = event.submitter?.value || "save";
+    const button = event.submitter || document.getElementById("save-material");
     let questions;
     try {
       questions = collectQuestionEditorData();
@@ -1955,7 +2071,7 @@ function bindMaterialEditorEvents() {
       return toast(error.message);
     }
     button.disabled = true;
-    button.textContent = "教材儲存中...";
+    button.textContent = intent === "assign" ? "正在發布..." : "教材儲存中...";
     try {
       await Cloud.saveMaterial({
         id: form.get("id") || "",
@@ -1963,16 +2079,23 @@ function bindMaterialEditorEvents() {
         description: form.get("description").trim(),
         ability: form.get("ability"),
         cefrLevel: form.get("cefrLevel"),
-        status: form.get("status"),
+        status: intent === "assign" ? "published" : form.get("status"),
         questions,
       });
       await refreshTeacherStudents(currentUser());
       closeMaterialEditor();
+      if (intent === "assign") currentPage = "missions";
       render();
-      toast("教材已儲存。");
+      if (intent === "assign") {
+        document.body.insertAdjacentHTML("beforeend", renderAssignmentEditor(currentUser()));
+        bindAssignmentEditorEvents();
+        toast("教材已發布，請選擇派發對象。");
+      } else {
+        toast("教材已儲存。");
+      }
     } catch (error) {
       button.disabled = false;
-      button.textContent = "重新儲存";
+      button.textContent = intent === "assign" ? "重新發布並指派" : "重新儲存";
       toast(`教材儲存失敗：${error.message}`);
     }
   });
@@ -2327,6 +2450,33 @@ function bindEvents() {
         button.disabled = false;
         toast(`封存失敗：${error.message}`);
       }
+    });
+  });
+
+  document.querySelectorAll(".publish-material").forEach((button) => {
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      button.textContent = "發布中...";
+      try {
+        await Cloud.publishMaterial(button.dataset.material);
+        await refreshTeacherStudents(currentUser());
+        currentPage = "missions";
+        render();
+        document.body.insertAdjacentHTML("beforeend", renderAssignmentEditor(currentUser()));
+        bindAssignmentEditorEvents();
+        toast("教材已發布，請選擇派發對象。");
+      } catch (error) {
+        button.disabled = false;
+        button.textContent = "重新發布";
+        toast(`發布失敗：${error.message}`);
+      }
+    });
+  });
+
+  document.querySelectorAll(".go-material-manager").forEach((button) => {
+    button.addEventListener("click", () => {
+      currentPage = "content";
+      render();
     });
   });
 
