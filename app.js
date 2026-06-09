@@ -323,6 +323,7 @@ let authMode = "login";
 let recoveryToken = "";
 let currentPage = "home";
 let selectedStudent = -1;
+let selectedAnalyticsStudent = -1;
 let selectedClassKey = "";
 let cloudStudents = [];
 let staffDashboard = null;
@@ -1785,24 +1786,47 @@ function renderAdminAnalytics(user) {
     ${renderClassCards(dashboard.classes)}`;
 }
 
-function curriculumPerformance(classroom) {
-  const students = classroom?.students || [];
+function curriculumAchievement(score, attempts) {
+  if (attempts < 5) return {
+    status: "證據不足",
+    statusKey: "insufficient",
+    explanation: `至少需要 5 題，目前只有 ${attempts} 題，暫不判定達成與否。`,
+  };
+  if (score >= 80) return {
+    status: "已達成",
+    statusKey: "achieved",
+    explanation: "本週答對率達 80% 以上，已達本平台形成性評量門檻。",
+  };
+  if (score >= 60) return {
+    status: "接近達成",
+    statusKey: "approaching",
+    explanation: "本週答對率為 60–79%，已有基礎，但仍需練習後再次檢核。",
+  };
+  return {
+    status: "尚未達成",
+    statusKey: "not-achieved",
+    explanation: "本週答對率低於 60%，建議先進行基礎補救與短題組重測。",
+  };
+}
+
+function curriculumPerformance(classroom, studentRecord = null) {
+  const students = studentRecord ? [studentRecord] : (classroom?.students || []);
   return curriculumCompetencies.map((competency) => {
     const abilityIndex = abilities.findIndex((ability) => ability.id === competency.ability);
     const attempts = students.flatMap((student) => student.attempts || [])
       .filter((attempt) => attempt.ability === competency.ability);
     const correct = attempts.filter((attempt) => attempt.is_correct).length;
-    const abilityAverage = classroom?.abilities?.[abilityIndex] || 0;
-    const score = attempts.length
-      ? Math.round((correct / attempts.length) * 100)
-      : abilityAverage;
+    const score = attempts.length ? Math.round((correct / attempts.length) * 100) : null;
+    const abilityValue = studentRecord
+      ? Number(studentRecord.abilities?.[abilityIndex] || 0)
+      : Number(classroom?.abilities?.[abilityIndex] || 0);
     const needsSupport = students.filter((student) =>
       Number(student.abilities?.[abilityIndex] || 0) < 60).length;
-    const status = score >= 80 ? "穩定達成" : score >= 60 ? "發展中" : "優先補強";
     return {
       ...competency,
       score,
-      status,
+      abilityValue,
+      ...curriculumAchievement(score || 0, attempts.length),
       attempts: attempts.length,
       correct,
       needsSupport,
@@ -1814,74 +1838,87 @@ function renderTeacherAnalytics(user) {
   const classes = teacherClasses();
   const classroom = selectedTeacherClass();
   const students = classroom?.students || [];
-  const performance = curriculumPerformance(classroom);
-  const measured = performance.filter((item) => item.attempts > 0);
-  const overall = measured.length
-    ? Math.round(measured.reduce((sum, item) => sum + item.score, 0) / measured.length)
-    : Math.round(performance.reduce((sum, item) => sum + item.score, 0) / performance.length);
-  const strongest = [...performance].sort((a, b) => b.score - a.score)[0];
-  const priority = [...performance].sort((a, b) => a.score - b.score)[0];
-  const totalAttempts = students.reduce((sum, student) => sum + (student.attempts?.length || 0), 0);
-  const studyDays = students.length
-    ? Math.round(students.reduce((sum, student) => sum + student.days, 0) / students.length * 10) / 10
+  const studentRecord = selectedAnalyticsStudent >= 0
+    ? students[selectedAnalyticsStudent] || null
+    : null;
+  const subjectStudents = studentRecord ? [studentRecord] : students;
+  const subjectLabel = studentRecord ? studentRecord.name : (classroom?.className || "全班");
+  const performance = curriculumPerformance(classroom, studentRecord);
+  const assessed = performance.filter((item) => item.statusKey !== "insufficient");
+  const overall = assessed.length
+    ? Math.round(assessed.reduce((sum, item) => sum + item.score, 0) / assessed.length)
+    : null;
+  const strongest = [...assessed].sort((a, b) => b.score - a.score)[0] || null;
+  const priority = [...assessed].sort((a, b) => a.score - b.score)[0] || null;
+  const achievedCount = assessed.filter((item) => item.statusKey === "achieved").length;
+  const totalAttempts = subjectStudents.reduce((sum, student) => sum + (student.attempts?.length || 0), 0);
+  const studyDays = subjectStudents.length
+    ? Math.round(subjectStudents.reduce((sum, student) => sum + student.days, 0) / subjectStudents.length * 10) / 10
     : 0;
   return `
-    ${teacherHeader(user, "課綱能力診斷", "依十二年國教英語文學習表現，分析本週班級證據並提供教學建議")}
+    ${teacherHeader(user, "課綱能力診斷", "切換全班或個別學生，查看明確的指標達成狀況與教學建議")}
     <section class="card learning-filter-bar analytics-filter">
       <div class="field"><label>診斷班級</label><select id="analytics-class-filter">${classes.map((item) => `<option value="${escapeHTML(item.key)}" ${item.key === classroom?.key ? "selected" : ""}>${escapeHTML(item.school)}・${escapeHTML(item.className)}</option>`).join("")}</select></div>
-      <div class="curriculum-disclaimer"><b>診斷依據</b><span>WonderGo 將平台作答紀錄對照國小英語文課綱學習表現；本報告供形成性評量與教學調整使用，並非官方認證成績。<a href="https://www.naer.edu.tw/PageSyllabus?fid=177" target="_blank" rel="noopener">查看國教院正式課綱</a></span></div>
+      <div class="field"><label>診斷對象</label><select id="analytics-student-filter"><option value="-1">全班整體表現</option>${students.map((student, index) => `<option value="${index}" ${index === selectedAnalyticsStudent ? "selected" : ""}>${escapeHTML(student.name)}（${escapeHTML(student.seat)}號）</option>`).join("")}</select></div>
+    </section>
+    <section class="card achievement-guide">
+      <div><b>判定方式</b><span>每項至少完成 5 題才判定</span></div>
+      <span class="achievement-badge achieved">✓ 已達成：80–100%</span>
+      <span class="achievement-badge approaching">△ 接近達成：60–79%</span>
+      <span class="achievement-badge not-achieved">! 尚未達成：0–59%</span>
+      <span class="achievement-badge insufficient">? 證據不足：少於 5 題</span>
+      <a href="https://www.naer.edu.tw/PageSyllabus?fid=177" target="_blank" rel="noopener">正式課綱來源</a>
     </section>
     <section class="metric-grid curriculum-metrics">
-      <article class="card metric"><span>課綱能力整體表現</span><strong>${overall} 分</strong><small>${overall >= 80 ? "穩定達成" : overall >= 60 ? "持續發展" : "需要系統補強"}</small></article>
-      <article class="card metric"><span>本週診斷證據</span><strong>${totalAttempts} 題</strong><small>${students.length} 位學生的實際作答</small></article>
-      <article class="card metric"><span>班級平均學習天數</span><strong>${studyDays} 天</strong><small>搭配作答表現判讀</small></article>
+      <article class="card metric"><span>${escapeHTML(subjectLabel)}整體答對率</span><strong>${overall === null ? "—" : `${overall}%`}</strong><small>${overall === null ? "目前證據不足" : "僅計入已有足夠證據的指標"}</small></article>
+      <article class="card metric"><span>已達成課綱面向</span><strong>${achievedCount}／5</strong><small>${assessed.length} 項已完成判定，${5 - assessed.length} 項證據不足</small></article>
+      <article class="card metric"><span>本週診斷證據</span><strong>${totalAttempts} 題</strong><small>${studentRecord ? "該生實際作答" : `${students.length} 位學生的實際作答`}</small></article>
+      <article class="card metric"><span>${studentRecord ? "本週學習天數" : "班級平均學習天數"}</span><strong>${studyDays} 天</strong><small>搭配作答表現判讀</small></article>
     </section>
     ${students.length ? `
-      <section class="curriculum-summary-grid">
+      ${strongest && priority ? `<section class="curriculum-summary-grid">
         <article class="card curriculum-summary strength">
-          <span>班級優勢</span>
-          <h2>${strongest.domain}｜${strongest.score} 分</h2>
-          <p>${strongest.statement}</p>
-          <b>建議：保留既有練習，增加跨情境應用與高層次挑戰。</b>
+          <span>已觀察到的優勢</span><h2>${strongest.domain}｜${strongest.score}%</h2>
+          <p>${strongest.statement}</p><b>建議：增加跨情境應用與整合挑戰。</b>
         </article>
         <article class="card curriculum-summary priority">
-          <span>優先教學焦點</span>
-          <h2>${priority.domain}｜${priority.score} 分</h2>
-          <p>${priority.statement}</p>
-          <b>建議：${priority.activity}</b>
+          <span>${priority.statusKey === "achieved" ? "下一個深化面向" : "下一個教學重點"}</span>
+          <h2>${priority.domain}｜${priority.status}</h2>
+          <p>${priority.statement}</p><b>建議：${priority.activity}</b>
         </article>
-      </section>
-      <div class="section-title"><div><h2>課綱能力表現診斷</h2><p>分數以本週同面向答題正確率為主；尚無作答時，以目前能力值作初步判讀。</p></div></div>
+      </section>` : '<div class="insight focus"><span>?</span><div><b>目前尚無足夠題目可判定達成狀況</b><p>每項課綱面向至少完成 5 題後，才會顯示已達成、接近達成或尚未達成。</p></div></div>'}
+      <div class="section-title"><div><h2>${escapeHTML(subjectLabel)}課綱指標判定</h2><p>每張卡片直接標示是否達成；「證據不足」不代表未達成。</p></div></div>
       <section class="curriculum-diagnostic-list">
         ${performance.map((item) => {
           const ability = abilities.find((entry) => entry.id === item.ability);
           return `
-            <article class="card curriculum-diagnostic" style="--curriculum-color:${ability.color}">
+            <article class="card curriculum-diagnostic status-${item.statusKey}" style="--curriculum-color:${ability.color}">
               <div class="curriculum-score">
                 <span>${ability.scene}</span>
-                <strong>${item.score}</strong>
-                <small>${item.status}</small>
+                <strong>${item.score === null ? "—" : `${item.score}%`}</strong>
+                <small class="achievement-badge ${item.statusKey}">${item.status}</small>
               </div>
               <div class="curriculum-detail">
                 <div class="curriculum-title"><div><span class="mission-tag">${item.codes}</span><h3>${item.domain}</h3></div><b>${item.attempts ? `${item.correct}／${item.attempts} 題答對` : "尚無本週作答"}</b></div>
                 <p class="curriculum-statement">${item.statement}</p>
+                <div class="achievement-result ${item.statusKey}"><b>判定結果：${item.status}</b><span>${item.explanation}</span></div>
                 <p class="curriculum-content"><b>對應學習內容：</b>${item.content}</p>
-                <div class="curriculum-evidence"><span>本週證據 ${item.attempts} 題</span><span>${item.needsSupport} 位學生低於 60</span></div>
-                <div class="curriculum-bar"><span style="width:${item.score}%"></span></div>
-                <div class="teaching-recommendation"><b>教學建議</b><p>${item.activity}</p></div>
+                <div class="curriculum-evidence"><span>本週證據 ${item.attempts} 題</span><span>${studentRecord ? `目前能力值 ${item.abilityValue}` : `${item.needsSupport} 位學生能力值低於 60`}</span></div>
+                <div class="curriculum-bar"><span style="width:${item.score || 0}%"></span></div>
+                <div class="teaching-recommendation"><b>${studentRecord ? "個別學習建議" : "班級教學建議"}</b><p>${item.statusKey === "achieved" ? "此項已達成，可增加新情境與整合應用，不必重複大量基礎題。" : item.activity}</p></div>
               </div>
             </article>`;
         }).join("")}
       </section>
-      <section class="card teaching-plan">
+      ${priority ? `<section class="card teaching-plan">
         <div><span class="quest-eyebrow">NEXT TEACHING CYCLE</span><h2>下一輪教學調整建議</h2></div>
         <ol>
-          <li><b>課前診斷：</b>先用 5 題「${priority.domain}」短測確認錯誤是否集中於特定字詞、句型或題型。</li>
+          <li><b>課前診斷：</b>先用 5 題「${priority.domain}」短測確認錯誤類型。</li>
           <li><b>課中介入：</b>${priority.activity}</li>
-          <li><b>差異化分組：</b>將 ${priority.needsSupport} 位需要補強的學生安排基礎任務，其餘學生進行情境應用挑戰。</li>
+          <li><b>${studentRecord ? "個別任務" : "差異化分組"}：</b>${studentRecord ? `安排「${priority.domain}」基礎任務，完成後再以不同題目重測。` : `將 ${priority.needsSupport} 位尚需支持的學生安排基礎任務，其餘學生進行情境應用挑戰。`}</li>
           <li><b>課後檢核：</b>隔 2 至 3 天以不同題目重測；正確率達 80% 再進入下一學習內容。</li>
         </ol>
-      </section>
+      </section>` : ""}
     ` : '<section class="card empty-page"><div><div class="big-icon">⌁</div><h2>此班級尚無可診斷資料</h2><p style="color:var(--muted)">學生完成訓練或教師任務後，系統會自動對照課綱能力並提出教學建議。</p></div></section>'}`;
 }
 
@@ -3018,6 +3055,12 @@ function bindEvents() {
 
   document.getElementById("analytics-class-filter")?.addEventListener("change", (event) => {
     selectedClassKey = event.target.value;
+    selectedAnalyticsStudent = -1;
+    render();
+  });
+
+  document.getElementById("analytics-student-filter")?.addEventListener("change", (event) => {
+    selectedAnalyticsStudent = Number(event.target.value);
     render();
   });
 
