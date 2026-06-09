@@ -982,7 +982,7 @@ function parseMaterialQuestions(text) {
   if (!lines.length) throw new Error("請至少輸入一題教材題目。");
   if (lines.length > 20) throw new Error("每份教材最多 20 題。");
   return lines.map((line, index) => {
-    const parts = line.split("|").map((part) => part.trim());
+    const parts = line.split(/[|｜]/).map((part) => part.trim());
     if (parts.length < 6 || parts.slice(1, 6).some((part) => !part)) {
       throw new Error(`第 ${index + 1} 題格式不完整，請確認題目與四個答案選項。`);
     }
@@ -992,6 +992,74 @@ function parseMaterialQuestions(text) {
       options: [parts[2], parts[3], parts[4], parts[5]],
       answer: 0,
       speech: parts[6] || "",
+    };
+  });
+}
+
+function emptyMaterialQuestion() {
+  return {
+    visual: "📝",
+    prompt: "",
+    options: ["", "", "", ""],
+    answer: 0,
+    speech: "",
+  };
+}
+
+function renderQuestionEditorCard(question = emptyMaterialQuestion(), index = 0) {
+  const normalized = normalizeQuestion(question);
+  const correctAnswer = normalized.options[normalized.answer] || "";
+  const wrongAnswers = normalized.options
+    .filter((_, optionIndex) => optionIndex !== normalized.answer)
+    .slice(0, 3);
+  while (wrongAnswers.length < 3) wrongAnswers.push("");
+  return `
+    <article class="question-editor-card" data-question-index="${index}">
+      <header>
+        <span class="question-number">第 ${index + 1} 題</span>
+        <div>
+          <button class="question-move" type="button" data-direction="up" aria-label="題目上移">↑</button>
+          <button class="question-move" type="button" data-direction="down" aria-label="題目下移">↓</button>
+          <button class="question-remove" type="button">刪除</button>
+        </div>
+      </header>
+      <div class="question-editor-grid">
+        <div class="field question-visual-field"><label>圖片／Emoji</label><input data-question-field="visual" value="${escapeHTML(normalized.visual || "📝")}" placeholder="🍎" /></div>
+        <div class="field question-prompt-field"><label>題目</label><input data-question-field="prompt" value="${escapeHTML(normalized.prompt || "")}" placeholder="哪一個單字是「蘋果」？" required /></div>
+        <div class="field correct-answer-field"><label>正確答案</label><input data-question-field="correct" value="${escapeHTML(correctAnswer)}" placeholder="apple" required /></div>
+        ${wrongAnswers.map((answer, wrongIndex) => `
+          <div class="field"><label>其他選項 ${wrongIndex + 1}</label><input data-question-field="wrong-${wrongIndex + 1}" value="${escapeHTML(answer)}" placeholder="請輸入完整選項" required /></div>`).join("")}
+        <div class="field full"><label>播放語音（選填）</label><input data-question-field="speech" value="${escapeHTML(normalized.speech || "")}" placeholder="需要聽力題時，輸入要播放的英文" /></div>
+      </div>
+    </article>`;
+}
+
+function renderQuestionEditorList(questions = []) {
+  const source = questions.length ? questions : [emptyMaterialQuestion()];
+  return source.map(renderQuestionEditorCard).join("");
+}
+
+function collectQuestionEditorData() {
+  const cards = [...document.querySelectorAll(".question-editor-card")];
+  if (!cards.length) throw new Error("請至少建立一題教材題目。");
+  if (cards.length > 20) throw new Error("每份教材最多 20 題。");
+  return cards.map((card, index) => {
+    const value = (field) =>
+      card.querySelector(`[data-question-field="${field}"]`)?.value.trim() || "";
+    const prompt = value("prompt");
+    const options = [value("correct"), value("wrong-1"), value("wrong-2"), value("wrong-3")];
+    if (!prompt || options.some((option) => !option)) {
+      throw new Error(`第 ${index + 1} 題尚未填完整，請確認題目與四個答案選項。`);
+    }
+    if (new Set(options.map((option) => option.toLowerCase())).size < 4) {
+      throw new Error(`第 ${index + 1} 題有重複選項，請改成四個不同答案。`);
+    }
+    return {
+      visual: value("visual") || "📝",
+      prompt,
+      options,
+      answer: 0,
+      speech: value("speech"),
     };
   });
 }
@@ -1017,13 +1085,24 @@ function renderMaterialEditor(material = null) {
             <div class="field"><label>適用程度</label><select name="cefrLevel">${["Pre-A1", "A1", "A2", "B1", "B2"].map((level) => `<option ${material?.cefrLevel === level ? "selected" : ""}>${level}</option>`).join("")}</select></div>
             <div class="field full"><label>發布狀態</label><select name="status"><option value="draft" ${material?.status === "draft" ? "selected" : ""}>草稿</option><option value="published" ${material?.status === "published" ? "selected" : ""}>發布，可供指派</option><option value="archived" ${material?.status === "archived" ? "selected" : ""}>封存</option></select></div>
             <div class="field full">
-              <label>教材題目</label>
-              <textarea class="question-source" name="questions" rows="10" placeholder="${escapeHTML(sample)}" required>${escapeHTML(questionsToText(material?.questions))}</textarea>
-              <small class="field-help">每行一題：圖片｜題目｜正確答案｜錯誤選項1｜錯誤選項2｜錯誤選項3｜播放語音（選填）</small>
+              <div class="question-editor-heading">
+                <div><label>教材題目</label><small class="field-help">逐題填寫，最多 20 題；可拖曳概念改用上下按鈕調整順序。</small></div>
+                <div><button class="secondary-btn" id="open-batch-import" type="button">批次匯入</button><button class="primary-btn" id="add-question" type="button">＋ 新增題目</button></div>
+              </div>
+              <div class="question-editor-list" id="question-editor-list">${renderQuestionEditorList(material?.questions || [])}</div>
             </div>
           </div>
           <div class="editor-actions"><button class="ghost-btn close-material-editor" type="button">取消</button><button class="primary-btn" id="save-material" type="submit">儲存教材</button></div>
         </form>
+      </article>
+    </div>
+    <div class="game-modal batch-import-modal hidden" id="batch-import-modal">
+      <article class="game-card batch-import-card">
+        <header><div><span class="mission-tag">快速匯入</span><h2>一次貼上多題</h2></div><button class="ghost-btn" id="close-batch-import" type="button">✕</button></header>
+        <p>每行一題，使用直線「｜」或鍵盤的「|」分隔欄位。</p>
+        <textarea class="question-source" id="batch-question-source" rows="10" placeholder="${escapeHTML(sample)}">${escapeHTML(material ? questionsToText(material.questions) : "")}</textarea>
+        <small class="field-help">格式：圖片｜題目｜正確答案｜選項2｜選項3｜選項4｜播放語音（選填）</small>
+        <div class="editor-actions"><button class="ghost-btn" id="cancel-batch-import" type="button">取消</button><button class="primary-btn" id="apply-batch-import" type="button">轉成題目卡片</button></div>
       </article>
     </div>`;
 }
@@ -1795,11 +1874,75 @@ function bindGameModalEvents() {
 
 function closeMaterialEditor() {
   document.getElementById("material-editor-modal")?.remove();
+  document.getElementById("batch-import-modal")?.remove();
 }
 
 function bindMaterialEditorEvents() {
   document.querySelectorAll(".close-material-editor").forEach((button) => {
     button.addEventListener("click", closeMaterialEditor);
+  });
+  const questionList = document.getElementById("question-editor-list");
+  const refreshQuestionCards = (questions) => {
+    questionList.innerHTML = renderQuestionEditorList(questions);
+  };
+  const currentQuestionDrafts = () => [...questionList.querySelectorAll(".question-editor-card")]
+    .map((card) => {
+      const value = (field) =>
+        card.querySelector(`[data-question-field="${field}"]`)?.value || "";
+      return {
+        visual: value("visual"),
+        prompt: value("prompt"),
+        options: [value("correct"), value("wrong-1"), value("wrong-2"), value("wrong-3")],
+        answer: 0,
+        speech: value("speech"),
+      };
+    });
+  document.getElementById("add-question")?.addEventListener("click", () => {
+    const questions = currentQuestionDrafts();
+    if (questions.length >= 20) return toast("每份教材最多 20 題。");
+    questions.push(emptyMaterialQuestion());
+    refreshQuestionCards(questions);
+    questionList.lastElementChild?.scrollIntoView({ behavior: "smooth", block: "center" });
+  });
+  questionList?.addEventListener("click", (event) => {
+    const card = event.target.closest(".question-editor-card");
+    if (!card) return;
+    const questions = currentQuestionDrafts();
+    const index = [...questionList.children].indexOf(card);
+    if (event.target.closest(".question-remove")) {
+      if (questions.length === 1) return toast("教材至少需要保留一題。");
+      questions.splice(index, 1);
+      refreshQuestionCards(questions);
+      return;
+    }
+    const moveButton = event.target.closest(".question-move");
+    if (!moveButton) return;
+    const targetIndex = moveButton.dataset.direction === "up" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= questions.length) return;
+    [questions[index], questions[targetIndex]] = [questions[targetIndex], questions[index]];
+    refreshQuestionCards(questions);
+    questionList.children[targetIndex]?.scrollIntoView({ behavior: "smooth", block: "center" });
+  });
+  const batchModal = document.getElementById("batch-import-modal");
+  const closeBatchImport = () => batchModal?.classList.add("hidden");
+  document.getElementById("open-batch-import")?.addEventListener("click", () => {
+    document.getElementById("batch-question-source").value =
+      questionsToText(currentQuestionDrafts());
+    batchModal?.classList.remove("hidden");
+  });
+  document.getElementById("close-batch-import")?.addEventListener("click", closeBatchImport);
+  document.getElementById("cancel-batch-import")?.addEventListener("click", closeBatchImport);
+  document.getElementById("apply-batch-import")?.addEventListener("click", () => {
+    try {
+      const questions = parseMaterialQuestions(
+        document.getElementById("batch-question-source").value,
+      );
+      refreshQuestionCards(questions);
+      closeBatchImport();
+      toast(`已匯入 ${questions.length} 題，請確認內容後儲存。`);
+    } catch (error) {
+      toast(error.message);
+    }
   });
   document.getElementById("material-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -1807,7 +1950,7 @@ function bindMaterialEditorEvents() {
     const button = document.getElementById("save-material");
     let questions;
     try {
-      questions = parseMaterialQuestions(form.get("questions"));
+      questions = collectQuestionEditorData();
     } catch (error) {
       return toast(error.message);
     }
