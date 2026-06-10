@@ -212,15 +212,31 @@ const Cloud = (() => {
     const day = monday.getDay();
     monday.setDate(monday.getDate() - (day === 0 ? 6 : day - 1));
     monday.setHours(0, 0, 0, 0);
-    const [progressRows, events] = await Promise.all([
+    const today = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Taipei",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
+    const [progressRows, allEvents, wrongAttempts, reviews] = await Promise.all([
       request(`/rest/v1/ability_progress?user_id=eq.${userId}&select=*`, { accessToken }),
       request(
         `/rest/v1/learning_events?user_id=eq.${userId}` +
-          `&created_at=gte.${encodeURIComponent(monday.toISOString())}` +
-          "&select=ability,score,xp_earned,duration_seconds,created_at&order=created_at.desc",
+          "&select=ability,event_type,score,xp_earned,duration_seconds,created_at&order=created_at.desc&limit=500",
+        { accessToken },
+      ),
+      request(
+        `/rest/v1/question_attempts?user_id=eq.${userId}&is_correct=eq.false` +
+          "&select=question_key,ability,prompt,question_type,vocabulary,selected_answer,correct_answer,created_at&order=created_at.desc&limit=100",
+        { accessToken },
+      ),
+      request(
+        `/rest/v1/wrong_question_reviews?user_id=eq.${userId}&review_date=eq.${today}` +
+          "&select=question_key,review_date,reviewed_at",
         { accessToken },
       ),
     ]);
+    const events = allEvents.filter((event) => new Date(event.created_at) >= monday);
     const progress = progressRows[0] || {};
     const abilityValues = {
       word: progress.word_power || 0,
@@ -236,6 +252,42 @@ const Cloud = (() => {
     const studyDays = new Set(
       events.map((event) => new Date(event.created_at).toISOString().slice(0, 10)),
     ).size;
+    const eventDates = new Set(allEvents.map((event) =>
+      new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Taipei",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(new Date(event.created_at))));
+    let streakDays = 0;
+    const cursor = new Date();
+    while (eventDates.has(new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Taipei",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(cursor))) {
+      streakDays += 1;
+      cursor.setDate(cursor.getDate() - 1);
+    }
+    const themeStages = new Map();
+    allEvents.forEach((event) => {
+      const match = event.event_type?.match(
+        /^task:ability:([a-z]+?)(listen|speak|read|write)$/,
+      );
+      if (!match) return;
+      if (!themeStages.has(match[1])) themeStages.set(match[1], new Set());
+      themeStages.get(match[1]).add(match[2]);
+    });
+    const completedThemeIds = [...themeStages.entries()]
+      .filter(([, stages]) => stages.size === 4)
+      .map(([themeId]) => themeId);
+    const uniqueWrongAttempts = [...new Map(
+      wrongAttempts.map((attempt) => [
+        `${attempt.prompt}::${attempt.correct_answer}`,
+        attempt,
+      ]),
+    ).values()];
 
     return {
       abilityValues,
@@ -245,6 +297,10 @@ const Cloud = (() => {
         completedTasks: events.length,
         xpEarned: events.reduce((total, event) => total + (event.xp_earned || 0), 0),
       },
+      streakDays,
+      completedThemeIds,
+      wrongBook: uniqueWrongAttempts,
+      reviewedQuestionKeys: reviews.map((review) => review.question_key),
     };
   }
 
@@ -253,7 +309,36 @@ const Cloud = (() => {
       abilityValues: { word: 0, echo: 0, story: 0, spell: 0, voice: 0 },
       abilityTrends: { word: 0, echo: 0, story: 0, spell: 0, voice: 0 },
       weeklySummary: { studyDays: 0, completedTasks: 0, xpEarned: 0 },
+      streakDays: 0,
+      completedThemeIds: [],
+      wrongBook: [],
+      reviewedQuestionKeys: [],
     };
+  }
+
+  async function setWrongQuestionReviewed(questionKey, reviewed) {
+    const session = getSession();
+    const userId = session?.user?.id;
+    if (!userId) throw new Error("請先登入。");
+    const today = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Taipei",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
+    if (!reviewed) {
+      await request(
+        `/rest/v1/wrong_question_reviews?user_id=eq.${userId}` +
+          `&question_key=eq.${encodeURIComponent(questionKey)}&review_date=eq.${today}`,
+        { method: "DELETE", headers: { Prefer: "return=minimal" } },
+      );
+      return;
+    }
+    await request("/rest/v1/wrong_question_reviews", {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify({ user_id: userId, question_key: questionKey, review_date: today }),
+    });
   }
 
   async function restoreSession() {
@@ -353,6 +438,24 @@ const Cloud = (() => {
       const studyDays = new Set(
         userEvents.map((event) => new Date(event.created_at).toISOString().slice(0, 10)),
       ).size;
+      const eventDates = new Set(userEvents.map((event) =>
+        new Intl.DateTimeFormat("en-CA", {
+          timeZone: "Asia/Taipei",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+        }).format(new Date(event.created_at))));
+      let streakDays = 0;
+      const streakCursor = new Date();
+      while (eventDates.has(new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Taipei",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(streakCursor))) {
+        streakDays += 1;
+        streakCursor.setDate(streakCursor.getDate() - 1);
+      }
       const averageScore = userEvents.length
         ? Math.round(userEvents.reduce((sum, event) => sum + Number(event.score || 0), 0) / userEvents.length)
         : 0;
@@ -373,6 +476,8 @@ const Cloud = (() => {
         passwordChangedAt: profile.password_changed_at,
         createdAt: profile.created_at,
         days: studyDays,
+        streakDays,
+        weeklyXp: userEvents.reduce((sum, event) => sum + Number(event.xp_earned || 0), 0),
         taskCount: userEvents.length,
         completion: Math.min(100, userEvents.length * 10),
         averageScore,
@@ -736,6 +841,7 @@ const Cloud = (() => {
     loadPlayerAssignments,
     completeAssignment,
     recordLearning,
+    setWrongQuestionReviewed,
     logout,
   };
 })();

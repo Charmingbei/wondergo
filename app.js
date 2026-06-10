@@ -51,6 +51,23 @@ const curriculumCompetencies = [
   },
 ];
 
+const textbookCatalog = {
+  康軒: ["Starter Unit", "Unit 1 人物與自我介紹", "Unit 2 年齡與數字", "Unit 3 家人與職業", "Review 1"],
+  翰林: ["Get Ready", "Unit 1 日常問候", "Unit 2 教室物品", "Unit 3 能力與活動", "Review 1"],
+  何嘉仁: ["Starter", "Unit 1 我的朋友", "Unit 2 食物與喜好", "Unit 3 時間與作息", "Review"],
+  自編教材: ["主題式單字", "生活情境對話", "閱讀與故事", "跨領域任務"],
+};
+
+const levelMilestones = [
+  { level: 1, xp: 0, title: "初航探索者" },
+  { level: 2, xp: 200, title: "晶石收集員" },
+  { level: 3, xp: 500, title: "回音偵察員" },
+  { level: 4, xp: 900, title: "故事解碼員" },
+  { level: 5, xp: 1400, title: "語宙冒險家" },
+  { level: 6, xp: 2100, title: "星際領航員" },
+  { level: 7, xp: 3000, title: "Wonder 大師" },
+];
+
 const worldThemes = [
   {
     id: "colors", name: "顏色國", en: "Color Kingdom", icon: "🎨", color: "#f06d73",
@@ -330,6 +347,10 @@ let staffDashboard = null;
 let adminAccountFilter = "all";
 let gameState = null;
 let selectedWorldCountry = null;
+let selectedPrepVersion = "康軒";
+let selectedPrepUnit = textbookCatalog["康軒"][0];
+let prepSourceText = "";
+let selectedPreviewStudent = 0;
 let teacherContent = { materials: [], assignments: [] };
 let playerAssignments = [];
 
@@ -608,6 +629,7 @@ function renderSidebar(user, isTeacher) {
     ["home", "⌂", "冒險首頁"],
     ["training", "✦", "五大訓練館"],
     ["world", "◎", "世界地圖"],
+    ["wrongbook", "▣", "我的錯題本"],
     ["report", "▤", "托奇週報"],
   ];
   const teacherNav = [
@@ -615,6 +637,8 @@ function renderSidebar(user, isTeacher) {
     ["students", "♙", "學生學習狀況"],
     ["missions", "✓", "指派任務"],
     ["content", "◇", "教材管理"],
+    ["prep", "▧", "備課中心"],
+    ["preview", "◉", "學生端預覽"],
     ["analytics", "⌁", "教學成效"],
   ];
   const adminNav = [
@@ -633,19 +657,22 @@ function renderSidebar(user, isTeacher) {
       </nav>
       <div class="sidebar-user">
         <span class="avatar">${escapeHTML((isTeacher ? user.realName : user.account).slice(0, 1))}</span>
-        <div><strong>${escapeHTML(isTeacher ? user.realName : user.account)}</strong><small>${isTeacher ? (user.role === "admin" ? "WonderGo 管理員" : `${user.className} 教師`) : `Lv.${user.level || 1} 探索者`}</small></div>
+        <div><strong>${escapeHTML(isTeacher ? user.realName : user.account)}</strong><small>${isTeacher ? (user.role === "admin" ? "WonderGo 管理員" : `${user.className} 教師`) : `Lv.${levelForXp(user.xp || 0).level} 探索者`}</small></div>
       </div>
     </aside>`;
 }
 
 function playerHeader(user, title, subtitle) {
+  const weeklyPoints = user.weeklySummary?.xpEarned || 0;
+  const streak = user.streakDays || 0;
+  const derivedLevel = levelForXp(user.xp || 0).level;
   return `
     <header class="topbar">
       <div><h1>${title}</h1><p>${subtitle}</p></div>
       <div class="top-stats">
-        <span class="stat-pill">🔥 連續 5 天</span>
-        <span class="stat-pill">⚡ ${user.xp || 0} XP</span>
-        <span class="stat-pill">🏅 Lv.${user.level || 1}</span>
+        <span class="stat-pill">🔥 連續 ${streak} 天</span>
+        <span class="stat-pill">✦ 本週 ${weeklyPoints} 分</span>
+        <span class="stat-pill">🏅 Lv.${derivedLevel}</span>
       </div>
     </header>`;
 }
@@ -654,6 +681,7 @@ function renderPlayerPage(user) {
   if (currentPage === "training") return renderTraining(user);
   if (currentPage === "ability") return renderPlayerHome(user);
   if (currentPage === "world") return renderWorldPage(user);
+  if (currentPage === "wrongbook") return renderWrongBook(user);
   if (currentPage === "report") return renderReport(user);
   return renderPlayerHome(user);
 }
@@ -661,10 +689,77 @@ function renderPlayerPage(user) {
 function renderPlayerHome(user) {
   return `
     ${playerHeader(user, `嗨，${escapeHTML(user.account)}！`, "今天也和 Toki 一起前進一點吧。")}
+    ${renderPlayerMomentum(user)}
     ${renderPlayerAssignments()}
     ${renderMissions()}
     ${renderTrainingMap(user)}
+    ${renderLevelJourney(user)}
+    ${renderThemeBadges(user)}
     ${renderAbilityDashboard(user)}`;
+}
+
+function levelForXp(xp) {
+  return [...levelMilestones].reverse().find((milestone) => xp >= milestone.xp)
+    || levelMilestones[0];
+}
+
+function renderPlayerMomentum(user) {
+  const streak = user.streakDays || 0;
+  const weeklyPoints = user.weeklySummary?.xpEarned || 0;
+  return `
+    <section class="momentum-strip">
+      <article><span>🔥</span><div><small>連續學習</small><strong>${streak} 天</strong></div><p>${streak ? "保持節奏，明天再來延續紀錄！" : "今天完成一項任務就能開始累積。"}</p></article>
+      <article><span>✦</span><div><small>本週積分</small><strong>${weeklyPoints} 分</strong></div><p>答對題目與完成任務都會累積本週積分。</p></article>
+    </section>`;
+}
+
+function renderLevelJourney(user) {
+  const xp = Number(user.xp || 0);
+  const current = levelForXp(xp);
+  const next = levelMilestones.find((milestone) => milestone.xp > xp);
+  return `
+    <section class="level-journey">
+      <div class="section-title">
+        <div><span class="quest-eyebrow">LEVEL JOURNEY</span><h2>積分晉級樹</h2><p>目前 Lv.${current.level} ${current.title}${next ? `，再 ${next.xp - xp} XP 可晉級` : "，已抵達目前最高階"}</p></div>
+        <span class="quest-reward">${xp} XP</span>
+      </div>
+      <div class="level-tree">
+        <div class="level-tree-line" aria-hidden="true"></div>
+        ${levelMilestones.map((milestone, index) => {
+          const unlocked = xp >= milestone.xp;
+          const active = milestone.level === current.level;
+          return `
+            <article class="level-node ${unlocked ? "unlocked" : "locked"} ${active ? "active" : ""}">
+              <span class="level-crown">${unlocked ? (active ? "★" : "✓") : "◇"}</span>
+              <b>Lv.${milestone.level}</b>
+              <strong>${milestone.title}</strong>
+              <small>${milestone.xp} XP</small>
+            </article>`;
+        }).join("")}
+      </div>
+    </section>`;
+}
+
+function renderThemeBadges(user) {
+  const completed = new Set(user.completedThemeIds || []);
+  return `
+    <section class="theme-badge-section">
+      <div class="section-title">
+        <div><span class="quest-eyebrow">MISSION BADGES</span><h2>主題任務獎章</h2><p>完成主題國家的聽、說、讀、寫四座關卡，即可解鎖專屬獎章。</p></div>
+        <span class="quest-reward">${completed.size}／${worldThemes.length} 已獲得</span>
+      </div>
+      <div class="theme-badge-grid">
+        ${worldThemes.map((theme) => {
+          const unlocked = completed.has(theme.id);
+          return `
+            <article class="theme-badge ${unlocked ? "unlocked" : "locked"}" style="--badge-color:${theme.color}">
+              <div class="badge-medallion"><span>${theme.icon}</span><i>✦</i></div>
+              <strong>${theme.name}徽章</strong>
+              <small>${unlocked ? "已解鎖" : "完成主題關卡解鎖"}</small>
+            </article>`;
+        }).join("")}
+      </div>
+    </section>`;
 }
 
 function renderPlayerAssignments() {
@@ -922,7 +1017,7 @@ function renderAbility(user) {
       <article class="card profile-card">
         <div class="profile-orb"><img src="assets/toki.png" alt="Toki 夥伴" /></div>
         <h2>${escapeHTML(user.account)}</h2>
-        <p style="color:var(--muted)">Lv.${user.level || 1}｜城市探索者｜CEFR ${escapeHTML(user.cefrLevel || "Pre-A1")}</p>
+        <p style="color:var(--muted)">Lv.${levelForXp(user.xp || 0).level}｜城市探索者｜CEFR ${escapeHTML(user.cefrLevel || "Pre-A1")}</p>
         <div class="radar-wrap">${radarSVG(actualAbilities)}</div>
         <b>${weeklyGrowth ? `本週完成 ${weeklyGrowth} 次能力訓練` : "本週尚未開始能力訓練"}</b>
       </article>
@@ -962,7 +1057,7 @@ function renderAbilityDashboard(user) {
         <article class="card profile-card">
           <div class="profile-orb"><img src="assets/toki.png" alt="Toki 夥伴" /></div>
           <h2>${escapeHTML(user.account)}</h2>
-          <p style="color:var(--muted)">Lv.${user.level || 1}｜城市探索者｜CEFR ${escapeHTML(user.cefrLevel || "Pre-A1")}</p>
+          <p style="color:var(--muted)">Lv.${levelForXp(user.xp || 0).level}｜城市探索者｜CEFR ${escapeHTML(user.cefrLevel || "Pre-A1")}</p>
           <div class="radar-wrap">${radarSVG(actualAbilities)}</div>
           <b>${weeklyGrowth ? `本週完成 ${weeklyGrowth} 次能力訓練` : "本週尚未開始能力訓練"}</b>
         </article>
@@ -983,6 +1078,122 @@ function renderAbilityDashboard(user) {
         </div>
       </section>
     </section>`;
+}
+
+function wrongBookItems(user) {
+  return user.wrongBook || [];
+}
+
+function spellingVariants(word) {
+  const clean = String(word || "").trim();
+  return [
+    clean,
+    clean.length > 3 ? `${clean.slice(0, 1)}${clean[2]}${clean[1]}${clean.slice(3)}` : `${clean}e`,
+    clean.length > 4 ? `${clean.slice(0, -1)}${clean.at(-2)}` : `${clean}${clean.at(-1)}`,
+    clean.replace(/[aeiou]/i, (vowel) => vowel === "a" ? "e" : "a"),
+  ].filter(Boolean);
+}
+
+function wrongBookQuizQuestions(user) {
+  const items = wrongBookItems(user).slice(0, 10);
+  const answerPool = [...new Set(items.flatMap((item) =>
+    [item.correct_answer, item.selected_answer].filter(Boolean)))];
+  return items.map((item, index) => {
+    let correct = item.correct_answer;
+    let prompt = `換個方式再試一次：${item.prompt}`;
+    let visual = "🔁";
+    let speech = "";
+    let options = [
+      correct,
+      ...answerPool.filter((answer) => answer !== correct),
+      "I don't know.",
+      "None of these.",
+    ].slice(0, 4);
+    if (item.vocabulary && /^[A-Za-z][A-Za-z '-]+$/.test(item.vocabulary)) {
+      if (index % 3 === 0) {
+        prompt = `選出「${item.vocabulary}」的正確拼字。`;
+        visual = "✏️";
+        correct = item.vocabulary;
+        options = spellingVariants(item.vocabulary);
+      } else if (index % 3 === 1) {
+        prompt = "聽一聽，選出你聽到的單字或句子。";
+        visual = "🎧";
+        speech = correct;
+      } else {
+        prompt = `閱讀原題的正確答案，選出相同意思的內容。`;
+        visual = "📖";
+      }
+    }
+    const unique = [...new Set(options)];
+    while (unique.length < 4) unique.push(`選項 ${unique.length + 1}`);
+    return shuffleQuestionOptions({
+      visual,
+      prompt,
+      options: unique.slice(0, 4),
+      answer: unique.indexOf(correct) >= 0 ? unique.indexOf(correct) : 0,
+      speech,
+    }, `wrongbook:${item.question_key}:${index}`);
+  });
+}
+
+function renderWrongBook(user) {
+  const items = wrongBookItems(user);
+  const reviewed = new Set(user.reviewedQuestionKeys || []);
+  const reviewedCount = items.filter((item) => reviewed.has(item.question_key)).length;
+  const types = new Set(items.map((item) => item.question_type).filter(Boolean)).size;
+  return `
+    ${playerHeader(user, "我的錯題本", "把不熟悉的題型與單字收進來，今天複習一點，明天更有把握。")}
+    <section class="metric-grid wrongbook-metrics">
+      <article class="card metric"><span>待複習錯題</span><strong>${items.length} 題</strong><small>依最近實際答錯紀錄</small></article>
+      <article class="card metric"><span>今日已複習</span><strong>${reviewedCount} 題</strong><small>${items.length ? Math.round(reviewedCount / items.length * 100) : 0}% 完成</small></article>
+      <article class="card metric"><span>錯誤題型</span><strong>${types} 種</strong><small>換題型再次檢核</small></article>
+    </section>
+    ${items.length ? `
+      <section class="wrongbook-action card">
+        <div><span class="quest-eyebrow">MASTERY CHECK</span><h2>用錯題內容重新組題</h2><p>系統會把原本的單字或答案換成拼字、聽力、閱讀等不同形式，確認是否真正精熟。</p></div>
+        <button class="primary-btn" id="start-wrongbook-quiz">用錯題考考我</button>
+      </section>
+      <div class="wrongbook-list">
+        ${items.map((item, index) => {
+          const isReviewed = reviewed.has(item.question_key);
+          const ability = abilities.find((entry) => entry.id === item.ability);
+          return `
+            <article class="card wrongbook-card ${isReviewed ? "reviewed" : ""}">
+              <header><span class="wrongbook-number">${String(index + 1).padStart(2, "0")}</span><div><span class="mission-tag">${escapeHTML(item.question_type || ability?.shortName || "綜合練習")}</span><h3>${escapeHTML(item.prompt)}</h3></div></header>
+              <div class="wrongbook-answer-grid">
+                <div class="wrong-answer"><small>上次誤選</small><b>${escapeHTML(item.selected_answer || "未作答")}</b></div>
+                <div class="correct-answer"><small>正確答案</small><b>${escapeHTML(item.correct_answer)}</b></div>
+                <div><small>核心單字／內容</small><b>${escapeHTML(item.vocabulary || item.correct_answer)}</b></div>
+              </div>
+              <label class="review-check"><input class="wrong-review-check" type="checkbox" data-question-key="${escapeHTML(item.question_key)}" ${isReviewed ? "checked" : ""} /><span>${isReviewed ? "今天已複習完成" : "完成複習後打勾"}</span></label>
+            </article>`;
+        }).join("")}
+      </div>
+    ` : '<section class="card empty-page"><div><div class="big-icon">✓</div><h2>目前沒有錯題</h2><p style="color:var(--muted)">完成訓練與教師任務後，答錯的題型和單字會自動收進這裡。</p><button class="primary-btn" data-page="training">前往訓練館</button></div></section>'}`;
+}
+
+function startWrongBookQuiz() {
+  const user = currentUser();
+  const questions = wrongBookQuizQuestions(user);
+  if (!questions.length) return toast("目前沒有可重新組題的錯題。");
+  gameState = {
+    mode: "wrongbook",
+    id: "review",
+    ability: "word",
+    title: "錯題變形精熟測驗",
+    color: "#6c4ee3",
+    taskKey: "wrongbook:review",
+    questions,
+    index: 0,
+    correct: 0,
+    answered: false,
+    selected: null,
+    synced: false,
+    attempts: [],
+    returnPage: "wrongbook",
+  };
+  document.body.insertAdjacentHTML("beforeend", renderGameModal());
+  bindGameModalEvents();
 }
 
 function renderReport(user) {
@@ -1023,6 +1234,8 @@ function renderTeacherPage(user) {
   if (currentPage === "students") return renderStudents(user);
   if (currentPage === "missions") return renderAssignmentManager(user);
   if (currentPage === "content") return renderMaterialManager(user);
+  if (currentPage === "prep") return renderPrepCenter(user);
+  if (currentPage === "preview") return renderStudentPreview(user);
   if (currentPage === "analytics") return renderTeacherAnalytics(user);
   return renderTeacherOverview(user);
 }
@@ -1067,6 +1280,192 @@ function renderMaterialManager(user) {
     ` : `
       <section class="card empty-page"><div><div class="big-icon">◇</div><h2>建立第一份教材</h2><p style="color:var(--muted)">輸入題目、答案與選項，發布後即可指派給學生。</p><button class="primary-btn open-material-editor">建立教材</button></div></section>
     `}`;
+}
+
+function prepUnitProfile(version, unit) {
+  const joined = `${version} ${unit}`;
+  const theme = joined.includes("食物") ? "food"
+    : joined.includes("家人") || joined.includes("職業") ? "family"
+      : joined.includes("教室") ? "school"
+        : joined.includes("時間") ? "time"
+          : joined.includes("朋友") || joined.includes("人物") || joined.includes("問候") ? "intro"
+            : "daily";
+  const profiles = {
+    food: {
+      goal: "能辨識常見食物字詞，使用 I like... / Do you like...? 表達喜好。",
+      vocabulary: "apple, banana, rice, bread, milk, juice",
+      sentence: "I like ___. / Do you like ___? Yes, I do.",
+      warmup: "用食物圖片進行 30 秒快速命名，再讓學生選出自己喜歡的食物。",
+      task: "兩人一組完成餐點喜好調查，最後用英語報告一位同學的答案。",
+    },
+    family: {
+      goal: "能介紹家人與職業，使用 This is my... / He or She is a...。",
+      vocabulary: "mother, father, sister, brother, teacher, doctor",
+      sentence: "This is my ___. / He is a ___.",
+      warmup: "出示角色卡，請學生猜人物關係並說出已知單字。",
+      task: "製作迷你家庭角色卡，以兩句英語完成介紹。",
+    },
+    school: {
+      goal: "能辨識教室物品並使用 What's this? / It's a... 進行問答。",
+      vocabulary: "book, pencil, ruler, desk, chair, schoolbag",
+      sentence: "What's this? / It's a ___.",
+      warmup: "教室尋寶：教師說單字，學生快速指出對應物品。",
+      task: "小組輪流抽物品卡，以完整問答句完成配對。",
+    },
+    time: {
+      goal: "能聽懂並表達整點時間與簡易日常作息。",
+      vocabulary: "morning, afternoon, evening, o'clock",
+      sentence: "What time is it? / It's ___ o'clock.",
+      warmup: "用時鐘圖片快速複習數字，猜測 Toki 的作息時間。",
+      task: "完成一日作息時間軸，和同伴進行時間問答。",
+    },
+    intro: {
+      goal: "能使用問候語、自我介紹並詢問姓名或基本資料。",
+      vocabulary: "hello, name, friend, student, teacher",
+      sentence: "What's your name? / My name is ___.",
+      warmup: "播放角色見面情境，學生找出聽到的問候語。",
+      task: "進行角色交換卡活動，和三位同學完成英語自我介紹。",
+    },
+    daily: {
+      goal: "能理解本單元核心字詞與句型，並在生活情境中完成簡易溝通。",
+      vocabulary: "依單元教材擷取 6–10 個核心字詞",
+      sentence: "依課本對話整理一組問句與回答句型",
+      warmup: "以圖片、動作或情境問題喚起先備知識。",
+      task: "設計兩人資訊差任務，讓學生必須使用目標句型完成挑戰。",
+    },
+  };
+  return profiles[theme];
+}
+
+function prepSourceInsights(profile) {
+  const uploadedTerms = teachingTermsFromText(prepSourceText).slice(0, 10);
+  const fallbackTerms = profile.vocabulary
+    .split(",")
+    .map((word) => word.trim())
+    .filter((word) => /^[A-Za-z][A-Za-z '-]+$/.test(word));
+  const terms = uploadedTerms.length
+    ? uploadedTerms
+    : fallbackTerms.map((english) => ({ english, meaning: "" }));
+  const termLabels = terms.map((term) =>
+    `<span>${escapeHTML(term.english)}${term.meaning ? `・${escapeHTML(term.meaning)}` : ""}</span>`,
+  ).join("");
+  return `
+    <section class="card prep-insight">
+      <div class="prep-insight-heading">
+        <div><span class="quest-eyebrow">SMART CO-PLANNING</span><h2>${prepSourceText ? "教材共備摘要" : "單元備課重點"}</h2></div>
+        <span class="status ${prepSourceText ? "success" : ""}">${prepSourceText ? "已讀取教師教材" : "版本單元建議"}</span>
+      </div>
+      <div class="prep-insight-grid">
+        <div><b>本課核心語料</b><div class="prep-term-list">${termLabels || "<span>上傳教材後自動整理</span>"}</div></div>
+        <div><b>教學調整建議</b><p>${prepSourceText
+          ? "先用教材中的原句做理解輸入，再將核心字詞放入圖片辨識、聽力選擇與口說任務；離堂前以不同題型再次檢核。"
+          : "先確認學生能辨識核心字詞，再進入完整句型；同一語料至少安排一次理解任務與一次表達任務。"}</p></div>
+        <div><b>共備提醒</b><p>${prepSourceText
+          ? `已讀取 ${prepSourceText.length.toLocaleString()} 字。建議從上方語料挑選 6–10 個核心字詞，避免單節課負荷過高。`
+          : "可上傳講義、簡報、PDF、Word、試算表或圖片，系統會擷取內容並更新共備建議。"}</p></div>
+      </div>
+    </section>`;
+}
+
+function renderPrepCenter(user) {
+  const units = textbookCatalog[selectedPrepVersion] || [];
+  if (!units.includes(selectedPrepUnit)) selectedPrepUnit = units[0];
+  const profile = prepUnitProfile(selectedPrepVersion, selectedPrepUnit);
+  const sourceNote = prepSourceText
+    ? `已分析教師教材 ${prepSourceText.length.toLocaleString()} 字，建議將教材中的核心字詞套入以下流程。`
+    : "尚未上傳自有教材；目前依版本與單元提供基礎規劃。";
+  return `
+    ${teacherHeader(user, "備課中心", "選擇教科書版本與單元，取得課程規劃、素材包與差異化教學建議")}
+    <section class="prep-hero">
+      <div><span class="quest-eyebrow">LESSON LAB</span><h2>和 Toki 一起把課備得更完整</h2><p>先選課本版本與單元，也能上傳自己的講義、簡報或學習單進行智慧共備。</p></div>
+      <img src="assets/toki.png" alt="Toki 備課夥伴" />
+    </section>
+    <section class="card prep-controls">
+      <div class="field"><label>教科書版本</label><select id="prep-version">${Object.keys(textbookCatalog).map((version) => `<option ${version === selectedPrepVersion ? "selected" : ""}>${version}</option>`).join("")}</select></div>
+      <div class="field"><label>單元</label><select id="prep-unit">${units.map((unit) => `<option ${unit === selectedPrepUnit ? "selected" : ""}>${unit}</option>`).join("")}</select></div>
+      <div class="field prep-upload-field"><label>教師自有教材</label><label class="secondary-btn teaching-file-button">上傳教材共備<input id="prep-material-file" type="file" /></label><small id="prep-file-status">${sourceNote}</small></div>
+    </section>
+    ${prepSourceInsights(profile)}
+    <section class="prep-plan-grid">
+      <article class="card prep-plan-card goal"><span>01</span><h3>學習目標</h3><p>${profile.goal}</p><b>核心字詞</b><small>${profile.vocabulary}</small><b>核心句型</b><small>${profile.sentence}</small></article>
+      <article class="card prep-plan-card flow"><span>02</span><h3>40 分鐘課程流程</h3><ol><li>暖身 5 分：${profile.warmup}</li><li>字詞輸入 10 分：圖像、發音、動作三路輸入。</li><li>句型操練 10 分：先全班、再同桌問答。</li><li>任務應用 12 分：${profile.task}</li><li>離堂檢核 3 分：一題聽力＋一題口說。</li></ol></article>
+      <article class="card prep-plan-card differentiation"><span>03</span><h3>差異化教學</h3><div><b>需要支持</b><p>提供圖像字卡、句首提示與二選一回答，先完成 4 個核心字詞。</p></div><div><b>符合程度</b><p>完成完整問答與資訊差任務，要求正確使用目標句型。</p></div><div><b>進階挑戰</b><p>移除句型支架，加入原因、數量或第三人稱描述。</p></div></article>
+    </section>
+    <div class="section-title"><div><h2>上課素材與教材資源包</h2><p>可直接搭配目前單元使用，再依班級狀況微調。</p></div></div>
+    <section class="resource-pack-grid">
+      <article class="card resource-pack"><span>🖼️</span><h3>圖像字卡包</h3><p>核心字詞、圖片與中文提示，適合暖身和分組配對。</p><button class="secondary-btn prep-resource-action" data-resource="圖像字卡包">加入教材草稿</button></article>
+      <article class="card resource-pack"><span>🎧</span><h3>聽力任務包</h3><p>由字詞辨識到簡易對話，提供基礎與挑戰兩種速度。</p><button class="secondary-btn prep-resource-action" data-resource="聽力任務包">建立練習題</button></article>
+      <article class="card resource-pack"><span>🎭</span><h3>情境口說卡</h3><p>角色、任務與句型支架，可用於兩人練習及小組闖關。</p><button class="secondary-btn prep-resource-action" data-resource="情境口說卡">建立口說任務</button></article>
+      <article class="card resource-pack"><span>📝</span><h3>離堂檢核單</h3><p>用 3 分鐘確認學生是否掌握本節核心字詞與句型。</p><button class="secondary-btn prep-resource-action" data-resource="離堂檢核單">建立檢核題</button></article>
+    </section>`;
+}
+
+function renderStudentPreview(user) {
+  const students = activeStudents();
+  if (selectedPreviewStudent >= students.length) selectedPreviewStudent = 0;
+  const previewStudent = students[selectedPreviewStudent];
+  const previewUser = {
+    account: previewStudent?.player || "學生玩家",
+    xp: previewStudent?.xp || 0,
+    cefrLevel: previewStudent?.level || "Pre-A1",
+    abilityValues: previewStudent ? Object.fromEntries(
+      abilities.map((ability, index) => [ability.id, previewStudent.abilities?.[index] || 0]),
+    ) : emptyAbilityValues(),
+    abilityTrends: emptyAbilityValues(),
+    weeklySummary: {
+      studyDays: previewStudent?.days || 0,
+      xpEarned: previewStudent?.weeklyXp || 0,
+      completedTasks: previewStudent?.taskCount || 0,
+    },
+    streakDays: previewStudent?.streakDays || 0,
+    completedThemeIds: previewStudent?.completedThemeIds || [],
+  };
+  return `
+    ${teacherHeader(user, "學生端預覽", "確認學生登入後看到的首頁、任務、晉級與能力資訊")}
+    <section class="preview-toolbar card">
+      <div class="field preview-student-field"><label>預覽學生</label><select id="preview-student">${students.map((student, index) => `<option value="${index}" ${index === selectedPreviewStudent ? "selected" : ""}>${escapeHTML(student.name)}（${escapeHTML(student.seat)}號）</option>`).join("") || '<option>目前沒有學生</option>'}</select></div>
+      <div><b>預覽身分：${escapeHTML(previewStudent?.name || "示範學生")}</b><p>此畫面為唯讀預覽，顯示目前已設定任務與學生實際能力，不會產生學習紀錄。</p></div>
+      <button class="secondary-btn" data-page="content">返回教材管理微調</button>
+    </section>
+    <section class="device-preview">
+      <div class="device-preview-bar"><span></span><b>WonderGo 學生首頁</b><em>唯讀預覽</em></div>
+      <div class="student-preview-content">
+        ${playerHeader(previewUser, `嗨，${escapeHTML(previewUser.account)}！`, "今天也和 Toki 一起前進一點吧。")}
+        ${renderPlayerMomentum(previewUser)}
+        ${renderPreviewAssignments(previewStudent)}
+        ${renderMissions()}
+        ${renderLevelJourney(previewUser)}
+        ${renderThemeBadges(previewUser)}
+        ${renderAbilityDashboard(previewUser)}
+      </div>
+    </section>`;
+}
+
+function renderPreviewAssignments(student) {
+  if (!student) return "";
+  const assignments = (teacherContent.assignments || []).filter((assignment) =>
+    !assignment.studentId || assignment.studentId === student.id);
+  if (!assignments.length) return "";
+  return `
+    <section class="assigned-quest-panel preview-assignment-panel">
+      <div class="section-title">
+        <div><span class="quest-eyebrow">TEACHER QUEST</span><h2>老師指派任務</h2><p>以下為此學生目前會看到的任務。</p></div>
+        <span class="quest-reward">${assignments.length} 項</span>
+      </div>
+      <div class="assigned-quest-grid">
+        ${assignments.slice(0, 5).map((assignment) => {
+          const material = teacherContent.materials.find((item) =>
+            item.id === assignment.materialId);
+          const ability = abilities.find((item) => item.id === material?.ability);
+          return `
+            <article class="assigned-quest" style="--assignment-color:${ability?.color || "#6c4ee3"}">
+              <span class="assigned-icon">${ability?.scene || "📝"}</span>
+              <div><span class="mission-tag">${escapeHTML(material?.cefrLevel || student.level || "Pre-A1")}</span><h3>${escapeHTML(assignment.title)}</h3><p>${escapeHTML(assignment.instructions || material?.description || "完成老師安排的學習任務。")}</p><small>獎勵 ${assignment.xpReward} XP</small></div>
+              <button class="primary-btn" disabled>開始任務</button>
+            </article>`;
+        }).join("")}
+      </div>
+    </section>`;
 }
 
 function questionsToText(questions = []) {
@@ -2348,23 +2747,26 @@ function renderGameModal() {
 function renderGameCard() {
   if (gameState.index >= gameState.questions.length) {
     const isAssignment = gameState.mode === "assignment";
+    const isWrongBook = gameState.mode === "wrongbook";
     const baseXp = isAssignment ? gameState.baseXp : 20 + gameState.correct * 5;
     const assignmentXp = isAssignment
       ? Math.floor(baseXp * (gameState.correct / gameState.questions.length))
       : baseXp;
     const user = currentUser();
     const completionCount = isAssignment ? 0 : getLocalDailyTaskCount(user, gameState.taskKey);
-    const expectedXp = isAssignment ? assignmentXp : calculateAwardedXp(baseXp, completionCount);
+    const expectedXp = isWrongBook ? 0
+      : isAssignment ? assignmentXp : calculateAwardedXp(baseXp, completionCount);
     return `
       <article class="game-card result-card">
         <div class="result-burst">🏆</div>
         <span class="mission-tag">訓練完成</span>
         <h2>${gameState.title}過關！</h2>
         <p>你完成了 ${gameState.questions.length} 題練習，答對 <strong>${gameState.correct}</strong> 題。</p>
-        <div class="result-xp">＋${expectedXp} XP</div>
+        <div class="result-xp">${isWrongBook ? `${gameState.correct}／${gameState.questions.length} 精熟` : `＋${expectedXp} XP`}</div>
+        ${isWrongBook ? '<p class="repeat-xp-note">這次是錯題精熟檢核，不重複發放經驗值。</p>' : ""}
         ${isAssignment ? '<p class="repeat-xp-note">教師任務依答對比例發放經驗值，答錯題不會獲得 XP。</p>' : ""}
         ${!isAssignment && completionCount >= 1 ? '<p class="repeat-xp-note">今日重複挑戰：本次經驗值折半</p>' : ""}
-        <button class="primary-btn wide" id="claim-result">領取經驗值</button>
+        <button class="primary-btn wide" id="claim-result">${isWrongBook ? "完成複習" : "領取經驗值"}</button>
       </article>`;
   }
 
@@ -2435,6 +2837,7 @@ async function claimGameResult() {
   }
   const user = currentUser();
   const isAssignment = gameState.mode === "assignment";
+  const isWrongBook = gameState.mode === "wrongbook";
   const assignmentXp = Math.floor(
     (gameState.baseXp || 0) * (gameState.correct / gameState.questions.length),
   );
@@ -2442,6 +2845,14 @@ async function claimGameResult() {
   const score = Math.round((gameState.correct / gameState.questions.length) * 100);
 
   try {
+    if (isWrongBook) {
+      currentPage = "wrongbook";
+      document.getElementById("game-modal")?.remove();
+      render();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      toast(`錯題複習完成，答對 ${gameState.correct}／${gameState.questions.length} 題。`);
+      return;
+    }
     let awardedXp = baseXp;
     if (isAssignment && user.cloud) {
       const updated = await Cloud.completeAssignment(
@@ -3062,6 +3473,106 @@ function bindEvents() {
   document.getElementById("analytics-student-filter")?.addEventListener("change", (event) => {
     selectedAnalyticsStudent = Number(event.target.value);
     render();
+  });
+
+  document.getElementById("prep-version")?.addEventListener("change", (event) => {
+    selectedPrepVersion = event.target.value;
+    selectedPrepUnit = textbookCatalog[selectedPrepVersion][0];
+    render();
+  });
+
+  document.getElementById("prep-unit")?.addEventListener("change", (event) => {
+    selectedPrepUnit = event.target.value;
+    render();
+  });
+
+  document.getElementById("preview-student")?.addEventListener("change", (event) => {
+    selectedPreviewStudent = Number(event.target.value);
+    render();
+  });
+
+  document.getElementById("prep-material-file")?.addEventListener("change", async (event) => {
+    const file = event.target.files?.[0];
+    const status = document.getElementById("prep-file-status");
+    if (!file) return;
+    if (status) status.textContent = `正在分析 ${file.name}...`;
+    try {
+      prepSourceText = (await extractTeachingMaterialText(file, (message) => {
+        if (status) status.textContent = `${message}｜${file.name}`;
+      })).trim();
+      render();
+      toast(`已讀取 ${file.name}，共備建議已更新。`);
+    } catch (error) {
+      if (status) status.textContent = "教材讀取失敗";
+      toast(error.message);
+    }
+  });
+
+  document.querySelectorAll(".prep-resource-action").forEach((button) => {
+    button.addEventListener("click", () => {
+      const profile = prepUnitProfile(selectedPrepVersion, selectedPrepUnit);
+      const uploadedWords = teachingTermsFromText(prepSourceText)
+        .map((term) => term.english)
+        .filter(Boolean);
+      const profileWords = profile.vocabulary
+        .split(",")
+        .map((word) => word.trim())
+        .filter((word) => /^[A-Za-z][A-Za-z '-]+$/.test(word));
+      const words = [...new Set([...uploadedWords, ...profileWords])].slice(0, 10);
+      const fallbackOptions = ["hello", "friend", "school", "teacher"];
+      const questions = words.slice(0, 6).map((word, index) => ({
+        visual: ["🖼️", "🎧", "🎭", "📝"][index % 4],
+        prompt: `選出本單元核心字詞「${word}」。`,
+        options: [...new Set([
+          word,
+          ...words.filter((item) => item !== word),
+          ...fallbackOptions.filter((item) => item !== word),
+        ])].slice(0, 4),
+        answer: 0,
+        speech: button.dataset.resource.includes("聽力") ? word : "",
+      }));
+      questions.forEach((question) => {
+        const answer = question.options[0];
+        question.options = seededShuffle(question.options, `${answer}:prep`);
+        question.answer = question.options.indexOf(answer);
+      });
+      document.body.insertAdjacentHTML("beforeend", renderMaterialEditor({
+        title: `${selectedPrepVersion} ${selectedPrepUnit}｜${button.dataset.resource}`,
+        description: profile.goal,
+        ability: button.dataset.resource.includes("聽力") ? "echo"
+          : button.dataset.resource.includes("口說") ? "voice" : "word",
+        cefrLevel: "Pre-A1",
+        status: "draft",
+        questions,
+      }));
+      bindMaterialEditorEvents();
+    });
+  });
+
+  document.getElementById("start-wrongbook-quiz")?.addEventListener("click", startWrongBookQuiz);
+
+  document.querySelectorAll(".wrong-review-check").forEach((checkbox) => {
+    checkbox.addEventListener("change", async () => {
+      const user = currentUser();
+      const questionKey = checkbox.dataset.questionKey;
+      checkbox.disabled = true;
+      try {
+        if (user.cloud) {
+          await Cloud.setWrongQuestionReviewed(questionKey, checkbox.checked);
+        }
+        const reviewed = new Set(user.reviewedQuestionKeys || []);
+        if (checkbox.checked) reviewed.add(questionKey);
+        else reviewed.delete(questionKey);
+        user.reviewedQuestionKeys = [...reviewed];
+        saveData();
+        render();
+        toast(checkbox.checked ? "已記錄今天完成複習。" : "已取消今日複習紀錄。");
+      } catch (error) {
+        checkbox.checked = !checkbox.checked;
+        checkbox.disabled = false;
+        toast(`更新失敗：${error.message}`);
+      }
+    });
   });
 
   document.querySelectorAll(".mission-action").forEach((button) => button.addEventListener("click", () => {
