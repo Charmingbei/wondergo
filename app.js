@@ -690,10 +690,10 @@ function renderPlayerHome(user) {
   return `
     ${playerHeader(user, `嗨，${escapeHTML(user.account)}！`, "今天也和 Toki 一起前進一點吧。")}
     ${renderPlayerMomentum(user)}
+    ${renderLevelJourney(user)}
     ${renderPlayerAssignments()}
     ${renderMissions()}
     ${renderTrainingMap(user)}
-    ${renderLevelJourney(user)}
     ${renderThemeBadges(user)}
     ${renderAbilityDashboard(user)}`;
 }
@@ -717,26 +717,21 @@ function renderLevelJourney(user) {
   const xp = Number(user.xp || 0);
   const current = levelForXp(xp);
   const next = levelMilestones.find((milestone) => milestone.xp > xp);
+  const progress = next
+    ? Math.max(0, Math.min(100, ((xp - current.xp) / (next.xp - current.xp)) * 100))
+    : 100;
   return `
-    <section class="level-journey">
-      <div class="section-title">
-        <div><span class="quest-eyebrow">LEVEL JOURNEY</span><h2>積分晉級樹</h2><p>目前 Lv.${current.level} ${current.title}${next ? `，再 ${next.xp - xp} XP 可晉級` : "，已抵達目前最高階"}</p></div>
-        <span class="quest-reward">${xp} XP</span>
+    <section class="level-journey compact">
+      <div class="level-current">
+        <span class="level-current-mark">★</span>
+        <div><small>目前等級</small><strong>Lv.${current.level} ${current.title}</strong></div>
       </div>
-      <div class="level-tree">
-        <div class="level-tree-line" aria-hidden="true"></div>
-        ${levelMilestones.map((milestone, index) => {
-          const unlocked = xp >= milestone.xp;
-          const active = milestone.level === current.level;
-          return `
-            <article class="level-node ${unlocked ? "unlocked" : "locked"} ${active ? "active" : ""}">
-              <span class="level-crown">${unlocked ? (active ? "★" : "✓") : "◇"}</span>
-              <b>Lv.${milestone.level}</b>
-              <strong>${milestone.title}</strong>
-              <small>${milestone.xp} XP</small>
-            </article>`;
-        }).join("")}
+      <div class="level-number-line">
+        <div class="level-line-labels"><span>${current.xp} XP</span><b>${xp} XP</b><span>${next ? `${next.xp} XP` : "MAX"}</span></div>
+        <div class="level-progress-track"><span style="width:${progress}%"></span><i style="left:${progress}%"></i></div>
+        <p>${next ? `再累積 ${next.xp - xp} XP，即可晉級 Lv.${next.level} ${next.title}` : "你已抵達目前最高階，繼續累積新的冒險紀錄！"}</p>
       </div>
+      <div class="level-next"><small>下一階</small><strong>${next ? `Lv.${next.level}` : "最高階"}</strong><span>${next?.title || current.title}</span></div>
     </section>`;
 }
 
@@ -966,13 +961,15 @@ function radarSVG(values = abilities) {
     .join("");
   const dataPoints = values
     .map((ability, index) => {
-      const point = pointAt(index, maxRadius * (ability.value / 100));
+      const visualValue = Math.max(ability.value, 4);
+      const point = pointAt(index, maxRadius * (visualValue / 100));
       return `${point.x},${point.y}`;
     })
     .join(" ");
   const dots = values
     .map((ability, index) => {
-      const point = pointAt(index, maxRadius * (ability.value / 100));
+      const visualValue = Math.max(ability.value, 4);
+      const point = pointAt(index, maxRadius * (visualValue / 100));
       return `<circle class="data-point" cx="${point.x}" cy="${point.y}" r="5" fill="${ability.color}" />`;
     })
     .join("");
@@ -989,6 +986,7 @@ function radarSVG(values = abilities) {
   return `
     <svg class="ability-radar" viewBox="0 0 300 300" role="img" aria-label="五大能力雷達圖">
       ${rings}${axes}
+      <circle class="radar-origin" cx="${center}" cy="${center}" r="4" />
       <polygon class="data-shape" points="${dataPoints}" />
       ${dots}${labels}
     </svg>`;
@@ -1015,9 +1013,9 @@ function renderAbility(user) {
     ${playerHeader(user, "我的能力", "看見自己的強項，也知道下一步可以怎麼進步。")}
     <section class="ability-page">
       <article class="card profile-card">
-        <div class="profile-orb"><img src="assets/toki.png" alt="Toki 夥伴" /></div>
-        <h2>${escapeHTML(user.account)}</h2>
-        <p style="color:var(--muted)">Lv.${levelForXp(user.xp || 0).level}｜城市探索者｜CEFR ${escapeHTML(user.cefrLevel || "Pre-A1")}</p>
+        <span class="quest-eyebrow">ABILITY RADAR</span>
+        <h2>我的學習能力雷達圖</h2>
+        <p style="color:var(--muted)">${escapeHTML(user.account)}｜Lv.${levelForXp(user.xp || 0).level}｜CEFR ${escapeHTML(user.cefrLevel || "Pre-A1")}</p>
         <div class="radar-wrap">${radarSVG(actualAbilities)}</div>
         <b>${weeklyGrowth ? `本週完成 ${weeklyGrowth} 次能力訓練` : "本週尚未開始能力訓練"}</b>
       </article>
@@ -1029,7 +1027,7 @@ function renderAbility(user) {
           </div>
         </article>
         <article class="card report-card" style="margin-top:20px">
-          <h2>Toki 的學習分析</h2>
+          <h2>學習分析</h2>
           ${hasLearningData ? `
             <div class="insight good"><span>✨</span><div><b>${strongest.name}是目前最強能力！</b><p>目前能力值為 ${strongest.value}，本週完成 ${strongest.trendValue} 次相關訓練。繼續挑戰可以讓優勢更穩定。</p></div></div>
             <div class="insight focus"><span>⚡</span><div><b>${weakest.name}是下一個補強方向</b><p>目前能力值為 ${weakest.value}。建議今天先完成一次「${weakest.name}」場館任務，逐步補足能力。</p></div></div>
@@ -1055,9 +1053,9 @@ function renderAbilityDashboard(user) {
       </div>
       <section class="ability-page">
         <article class="card profile-card">
-          <div class="profile-orb"><img src="assets/toki.png" alt="Toki 夥伴" /></div>
-          <h2>${escapeHTML(user.account)}</h2>
-          <p style="color:var(--muted)">Lv.${levelForXp(user.xp || 0).level}｜城市探索者｜CEFR ${escapeHTML(user.cefrLevel || "Pre-A1")}</p>
+          <span class="quest-eyebrow">ABILITY RADAR</span>
+          <h2>我的學習能力雷達圖</h2>
+          <p style="color:var(--muted)">${escapeHTML(user.account)}｜Lv.${levelForXp(user.xp || 0).level}｜CEFR ${escapeHTML(user.cefrLevel || "Pre-A1")}</p>
           <div class="radar-wrap">${radarSVG(actualAbilities)}</div>
           <b>${weeklyGrowth ? `本週完成 ${weeklyGrowth} 次能力訓練` : "本週尚未開始能力訓練"}</b>
         </article>
@@ -1069,7 +1067,7 @@ function renderAbilityDashboard(user) {
             </div>
           </article>
           <article class="card report-card" style="margin-top:20px">
-            <h2>Toki 的學習分析</h2>
+            <h2>學習分析</h2>
             ${hasLearningData ? `
               <div class="insight good"><span>✨</span><div><b>${strongest.name}是目前最強能力</b><p>目前能力值 ${strongest.value}，持續挑戰能讓優勢更穩定。</p></div></div>
               <div class="insight focus"><span>⚡</span><div><b>下一步補強 ${weakest.name}</b><p>目前能力值 ${weakest.value}，建議今天完成一次相關場館任務。</p></div></div>
@@ -1094,38 +1092,66 @@ function spellingVariants(word) {
   ].filter(Boolean);
 }
 
+function isSingleEnglishWord(value) {
+  return /^[A-Za-z]+(?:[-'][A-Za-z]+)?$/.test(String(value || "").trim());
+}
+
 function wrongBookQuizQuestions(user) {
   const items = wrongBookItems(user).slice(0, 10);
   const answerPool = [...new Set(items.flatMap((item) =>
     [item.correct_answer, item.selected_answer].filter(Boolean)))];
   return items.map((item, index) => {
-    let correct = item.correct_answer;
-    let prompt = `換個方式再試一次：${item.prompt}`;
+    const originalCorrect = String(item.correct_answer || "").trim();
+    const vocabulary = String(item.vocabulary || "").trim();
+    const spellingWord = isSingleEnglishWord(vocabulary) ? vocabulary
+      : isSingleEnglishWord(originalCorrect) ? originalCorrect : "";
+    let correct = originalCorrect;
+    let prompt = `再挑戰一次：${item.prompt}`;
     let visual = "🔁";
     let speech = "";
     let options = [
       correct,
-      ...answerPool.filter((answer) => answer !== correct),
-      "I don't know.",
-      "None of these.",
+      ...answerPool.filter((answer) =>
+        answer !== correct &&
+        (spellingWord ? isSingleEnglishWord(answer) : !isSingleEnglishWord(answer))),
+      "I am fine.",
+      "Thank you.",
+      "Good morning.",
+      "See you.",
     ].slice(0, 4);
-    if (item.vocabulary && /^[A-Za-z][A-Za-z '-]+$/.test(item.vocabulary)) {
+    if (spellingWord) {
       if (index % 3 === 0) {
-        prompt = `選出「${item.vocabulary}」的正確拼字。`;
+        prompt = `選出「${spellingWord}」的正確拼字。`;
         visual = "✏️";
-        correct = item.vocabulary;
-        options = spellingVariants(item.vocabulary);
+        correct = spellingWord;
+        options = spellingVariants(spellingWord);
       } else if (index % 3 === 1) {
-        prompt = "聽一聽，選出你聽到的單字或句子。";
+        prompt = "聽一聽，選出你聽到的單字。";
         visual = "🎧";
-        speech = correct;
-      } else {
-        prompt = `閱讀原題的正確答案，選出相同意思的內容。`;
-        visual = "📖";
+        correct = spellingWord;
+        speech = spellingWord;
+        options = [
+          spellingWord,
+          ...answerPool.filter((answer) =>
+            isSingleEnglishWord(answer) && answer !== spellingWord),
+          ...["book", "friend", "school", "happy"].filter((answer) =>
+            answer !== spellingWord),
+        ].slice(0, 4);
       }
+    } else if (index % 2 === 1) {
+      prompt = "聽一聽，選出正確的句子。";
+      visual = "🎧";
+      speech = originalCorrect;
     }
     const unique = [...new Set(options)];
-    while (unique.length < 4) unique.push(`選項 ${unique.length + 1}`);
+    const fallbackAnswers = spellingWord
+      ? ["review", "practice", "lesson", "answer"]
+      : ["I am ready.", "Please try again.", "This is my book.", "It is sunny."];
+    fallbackAnswers.forEach((answer) => {
+      if (unique.length < 4 && answer !== correct && !unique.includes(answer)) {
+        unique.push(answer);
+      }
+    });
     return shuffleQuestionOptions({
       visual,
       prompt,
@@ -1145,13 +1171,13 @@ function renderWrongBook(user) {
     ${playerHeader(user, "我的錯題本", "把不熟悉的題型與單字收進來，今天複習一點，明天更有把握。")}
     <section class="metric-grid wrongbook-metrics">
       <article class="card metric"><span>待複習錯題</span><strong>${items.length} 題</strong><small>依最近實際答錯紀錄</small></article>
-      <article class="card metric"><span>今日已複習</span><strong>${reviewedCount} 題</strong><small>${items.length ? Math.round(reviewedCount / items.length * 100) : 0}% 完成</small></article>
+      <article class="card metric"><span>今日已複習</span><strong id="wrong-reviewed-count">${reviewedCount} 題</strong><small id="wrong-reviewed-percent">${items.length ? Math.round(reviewedCount / items.length * 100) : 0}% 完成</small></article>
       <article class="card metric"><span>錯誤題型</span><strong>${types} 種</strong><small>換題型再次檢核</small></article>
     </section>
     ${items.length ? `
       <section class="wrongbook-action card">
         <div><span class="quest-eyebrow">MASTERY CHECK</span><h2>用錯題內容重新組題</h2><p>系統會把原本的單字或答案換成拼字、聽力、閱讀等不同形式，確認是否真正精熟。</p></div>
-        <button class="primary-btn" id="start-wrongbook-quiz">用錯題考考我</button>
+        <button class="primary-btn" id="start-wrongbook-quiz">用錯題考考我・完成得 5 XP</button>
       </section>
       <div class="wrongbook-list">
         ${items.map((item, index) => {
@@ -1163,9 +1189,8 @@ function renderWrongBook(user) {
               <div class="wrongbook-answer-grid">
                 <div class="wrong-answer"><small>上次誤選</small><b>${escapeHTML(item.selected_answer || "未作答")}</b></div>
                 <div class="correct-answer"><small>正確答案</small><b>${escapeHTML(item.correct_answer)}</b></div>
-                <div><small>核心單字／內容</small><b>${escapeHTML(item.vocabulary || item.correct_answer)}</b></div>
               </div>
-              <label class="review-check"><input class="wrong-review-check" type="checkbox" data-question-key="${escapeHTML(item.question_key)}" ${isReviewed ? "checked" : ""} /><span>${isReviewed ? "今天已複習完成" : "完成複習後打勾"}</span></label>
+              <label class="review-check"><input class="wrong-review-check" type="checkbox" data-wrong-index="${index}" ${isReviewed ? "checked" : ""} /><span><b>${isReviewed ? "✓ 今天已複習完成" : "今日複習完成"}</b><small>${isReviewed ? "可再次點選取消" : "點這裡或方框打勾"}</small></span></label>
             </article>`;
         }).join("")}
       </div>
@@ -2754,7 +2779,7 @@ function renderGameCard() {
       : baseXp;
     const user = currentUser();
     const completionCount = isAssignment ? 0 : getLocalDailyTaskCount(user, gameState.taskKey);
-    const expectedXp = isWrongBook ? 0
+    const expectedXp = isWrongBook ? 5
       : isAssignment ? assignmentXp : calculateAwardedXp(baseXp, completionCount);
     return `
       <article class="game-card result-card">
@@ -2762,10 +2787,10 @@ function renderGameCard() {
         <span class="mission-tag">訓練完成</span>
         <h2>${gameState.title}過關！</h2>
         <p>你完成了 ${gameState.questions.length} 題練習，答對 <strong>${gameState.correct}</strong> 題。</p>
-        <div class="result-xp">${isWrongBook ? `${gameState.correct}／${gameState.questions.length} 精熟` : `＋${expectedXp} XP`}</div>
-        ${isWrongBook ? '<p class="repeat-xp-note">這次是錯題精熟檢核，不重複發放經驗值。</p>' : ""}
+        <div class="result-xp">${isWrongBook ? "＋5 XP" : `＋${expectedXp} XP`}</div>
+        ${isWrongBook ? `<p class="repeat-xp-note">完成錯題精熟檢核，答對 ${gameState.correct}／${gameState.questions.length} 題。</p>` : ""}
         ${isAssignment ? '<p class="repeat-xp-note">教師任務依答對比例發放經驗值，答錯題不會獲得 XP。</p>' : ""}
-        ${!isAssignment && completionCount >= 1 ? '<p class="repeat-xp-note">今日重複挑戰：本次經驗值折半</p>' : ""}
+        ${!isAssignment && !isWrongBook && completionCount >= 1 ? '<p class="repeat-xp-note">今日重複挑戰：本次經驗值折半</p>' : ""}
         <button class="primary-btn wide" id="claim-result">${isWrongBook ? "完成複習" : "領取經驗值"}</button>
       </article>`;
   }
@@ -2846,11 +2871,25 @@ async function claimGameResult() {
 
   try {
     if (isWrongBook) {
+      const awardedXp = 5;
+      if (user.cloud) {
+        const updated = await Cloud.completeWrongBookReview();
+        user.xp = updated.xp;
+        user.abilityValues = updated.abilityValues;
+        user.abilityTrends = updated.abilityTrends;
+        user.weeklySummary = updated.weeklySummary;
+        user.streakDays = updated.streakDays;
+      } else {
+        user.xp = (user.xp || 0) + awardedXp;
+        user.weeklySummary ||= { studyDays: 0, completedTasks: 0, xpEarned: 0 };
+        user.weeklySummary.xpEarned += awardedXp;
+        saveData();
+      }
       currentPage = "wrongbook";
       document.getElementById("game-modal")?.remove();
       render();
       window.scrollTo({ top: 0, behavior: "smooth" });
-      toast(`錯題複習完成，答對 ${gameState.correct}／${gameState.questions.length} 題。`);
+      toast(`錯題複習完成，獲得 ${awardedXp} XP！`);
       return;
     }
     let awardedXp = baseXp;
@@ -3554,7 +3593,18 @@ function bindEvents() {
   document.querySelectorAll(".wrong-review-check").forEach((checkbox) => {
     checkbox.addEventListener("change", async () => {
       const user = currentUser();
-      const questionKey = checkbox.dataset.questionKey;
+      const item = wrongBookItems(user)[Number(checkbox.dataset.wrongIndex)];
+      if (!item) return;
+      const questionKey = item.question_key;
+      const card = checkbox.closest(".wrongbook-card");
+      const label = checkbox.closest(".review-check");
+      const labelTitle = label?.querySelector("b");
+      const labelHelp = label?.querySelector("small");
+      card?.classList.toggle("reviewed", checkbox.checked);
+      if (labelTitle) labelTitle.textContent = checkbox.checked
+        ? "✓ 今天已複習完成" : "今日複習完成";
+      if (labelHelp) labelHelp.textContent = checkbox.checked
+        ? "可再次點選取消" : "點這裡或方框打勾";
       checkbox.disabled = true;
       try {
         if (user.cloud) {
@@ -3565,10 +3615,25 @@ function bindEvents() {
         else reviewed.delete(questionKey);
         user.reviewedQuestionKeys = [...reviewed];
         saveData();
-        render();
+        const reviewedCount = wrongBookItems(user)
+          .filter((wrongItem) => reviewed.has(wrongItem.question_key)).length;
+        const countElement = document.getElementById("wrong-reviewed-count");
+        const percentElement = document.getElementById("wrong-reviewed-percent");
+        if (countElement) countElement.textContent = `${reviewedCount} 題`;
+        if (percentElement) {
+          percentElement.textContent = `${wrongBookItems(user).length
+            ? Math.round(reviewedCount / wrongBookItems(user).length * 100)
+            : 0}% 完成`;
+        }
+        checkbox.disabled = false;
         toast(checkbox.checked ? "已記錄今天完成複習。" : "已取消今日複習紀錄。");
       } catch (error) {
         checkbox.checked = !checkbox.checked;
+        card?.classList.toggle("reviewed", checkbox.checked);
+        if (labelTitle) labelTitle.textContent = checkbox.checked
+          ? "✓ 今天已複習完成" : "今日複習完成";
+        if (labelHelp) labelHelp.textContent = checkbox.checked
+          ? "可再次點選取消" : "點這裡或方框打勾";
         checkbox.disabled = false;
         toast(`更新失敗：${error.message}`);
       }

@@ -78,7 +78,8 @@ const Cloud = (() => {
             ...options.headers,
           },
         });
-        const body = response.status === 204 ? null : await response.json();
+        const responseText = response.status === 204 ? "" : await response.text();
+        const body = responseText.trim() ? JSON.parse(responseText) : null;
         return { response, body };
       };
       const session = getSession();
@@ -247,7 +248,10 @@ const Cloud = (() => {
     };
     const abilityTrends = { word: 0, echo: 0, story: 0, spell: 0, voice: 0 };
     events.forEach((event) => {
-      if (event.ability in abilityTrends) abilityTrends[event.ability] += 1;
+      if (
+        event.event_type !== "review:wrongbook" &&
+        event.ability in abilityTrends
+      ) abilityTrends[event.ability] += 1;
     });
     const studyDays = new Set(
       events.map((event) => new Date(event.created_at).toISOString().slice(0, 10)),
@@ -339,6 +343,18 @@ const Cloud = (() => {
       headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
       body: JSON.stringify({ user_id: userId, question_key: questionKey, review_date: today }),
     });
+  }
+
+  async function completeWrongBookReview() {
+    const result = await request("/rest/v1/rpc/complete_wrongbook_review", {
+      method: "POST",
+      body: "{}",
+    });
+    return {
+      ...result.profile,
+      awardedXp: result.awarded_xp,
+      ...(await loadPlayerLearningData()),
+    };
   }
 
   async function restoreSession() {
@@ -841,6 +857,7 @@ const Cloud = (() => {
     loadPlayerAssignments,
     completeAssignment,
     recordLearning,
+    completeWrongBookReview,
     setWrongQuestionReviewed,
     logout,
   };
