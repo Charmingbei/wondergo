@@ -636,8 +636,8 @@ function renderSidebar(user, isTeacher) {
     ["overview", "▦", "班級總覽"],
     ["students", "♙", "學生學習狀況"],
     ["missions", "✓", "指派任務"],
-    ["content", "◇", "教材管理"],
     ["prep", "▧", "備課中心"],
+    ["content", "◇", "教材管理"],
     ["preview", "◉", "學生端預覽"],
     ["analytics", "⌁", "教學成效"],
   ];
@@ -694,8 +694,8 @@ function renderPlayerHome(user) {
     ${renderPlayerAssignments()}
     ${renderMissions()}
     ${renderTrainingMap(user)}
-    ${renderThemeBadges(user)}
-    ${renderAbilityDashboard(user)}`;
+    ${renderAbilityDashboard(user)}
+    ${renderThemeBadges(user)}`;
 }
 
 function levelForXp(xp) {
@@ -961,14 +961,14 @@ function radarSVG(values = abilities) {
     .join("");
   const dataPoints = values
     .map((ability, index) => {
-      const visualValue = Math.max(ability.value, 4);
+      const visualValue = Math.max(ability.value, 12);
       const point = pointAt(index, maxRadius * (visualValue / 100));
       return `${point.x},${point.y}`;
     })
     .join(" ");
   const dots = values
     .map((ability, index) => {
-      const visualValue = Math.max(ability.value, 4);
+      const visualValue = Math.max(ability.value, 12);
       const point = pointAt(index, maxRadius * (visualValue / 100));
       return `<circle class="data-point" cx="${point.x}" cy="${point.y}" r="5" fill="${ability.color}" />`;
     })
@@ -984,7 +984,7 @@ function radarSVG(values = abilities) {
     })
     .join("");
   return `
-    <svg class="ability-radar" viewBox="0 0 300 300" role="img" aria-label="五大能力雷達圖">
+    <svg class="ability-radar" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" width="300" height="300" role="img" aria-label="五大能力雷達圖">
       ${rings}${axes}
       <circle class="radar-origin" cx="${center}" cy="${center}" r="4" />
       <polygon class="data-shape" points="${dataPoints}" />

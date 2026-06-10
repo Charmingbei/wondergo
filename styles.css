@@ -1561,8 +1561,9 @@ button {
 .ability-radar {
   display: block;
   width: min(100%, 285px);
-  min-height: 260px;
   height: auto;
+  min-height: 285px;
+  aspect-ratio: 1 / 1;
   margin: 0 auto;
   overflow: visible;
 }
@@ -2985,7 +2986,10 @@ button {
 .radar-wrap {
   position: relative;
   width: min(100%, 300px);
-  min-height: 280px;
+  min-height: 300px;
+  aspect-ratio: 1 / 1;
+  display: grid;
+  place-items: center;
   margin: 20px auto 8px;
   padding: 6px;
   border-radius: 22px;
