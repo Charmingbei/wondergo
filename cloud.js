@@ -594,13 +594,29 @@ const Cloud = (() => {
   }
 
   async function loadTeacherContent() {
-    const [materials, assignments, completions] = await Promise.all([
+    const [materials, assignments, completions, packs, resources] = await Promise.all([
       request("/rest/v1/learning_materials?select=*&order=updated_at.desc"),
       request("/rest/v1/learning_assignments?select=*&order=created_at.desc"),
       request("/rest/v1/assignment_completions?select=*&order=completed_at.desc"),
+      request("/rest/v1/course_packs?select=*&order=updated_at.desc"),
+      request("/rest/v1/course_pack_resources?select=*&order=updated_at.desc"),
     ]);
     return {
       materials: materials.map(mapMaterial),
+      packs: packs.map((pack) => ({
+        id: pack.id,
+        teacherId: pack.teacher_id,
+        title: pack.title,
+        textbookVersion: pack.textbook_version,
+        unitName: pack.unit_name,
+        courseName: pack.course_name,
+        description: pack.description,
+        createdAt: pack.created_at,
+        updatedAt: pack.updated_at,
+        resources: resources
+          .filter((resource) => resource.pack_id === pack.id)
+          .map(mapCoursePackResource),
+      })),
       assignments: assignments.map((assignment) => ({
         ...mapAssignment(assignment),
         completions: completions
@@ -608,6 +624,61 @@ const Cloud = (() => {
           .map(mapCompletion),
       })),
     };
+  }
+
+  async function saveCoursePack(values) {
+    const session = getSession();
+    const payload = {
+      teacher_id: session.user.id,
+      title: values.title,
+      textbook_version: values.textbookVersion || "",
+      unit_name: values.unitName || "",
+      course_name: values.courseName || "",
+      description: values.description || "",
+      updated_at: new Date().toISOString(),
+    };
+    const path = values.id
+      ? `/rest/v1/course_packs?id=eq.${values.id}`
+      : "/rest/v1/course_packs";
+    const rows = await request(path, {
+      method: values.id ? "PATCH" : "POST",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify(payload),
+    });
+    return rows[0];
+  }
+
+  async function saveCoursePackResource(values) {
+    const session = getSession();
+    const rows = await request("/rest/v1/course_pack_resources", {
+      method: "POST",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify({
+        pack_id: values.packId,
+        teacher_id: session.user.id,
+        resource_key: values.resourceKey,
+        title: values.title,
+        resource_type: values.resourceType,
+        audience: values.audience,
+        content: values.content,
+        material_id: values.materialId || null,
+      }),
+    });
+    return mapCoursePackResource(rows[0]);
+  }
+
+  async function deleteCoursePack(packId) {
+    await request(`/rest/v1/course_packs?id=eq.${packId}`, {
+      method: "DELETE",
+      headers: { Prefer: "return=minimal" },
+    });
+  }
+
+  async function deleteCoursePackResource(resourceId) {
+    await request(`/rest/v1/course_pack_resources?id=eq.${resourceId}`, {
+      method: "DELETE",
+      headers: { Prefer: "return=minimal" },
+    });
   }
 
   async function saveMaterial(values) {
@@ -838,6 +909,22 @@ const Cloud = (() => {
     };
   }
 
+  function mapCoursePackResource(resource) {
+    return {
+      id: resource.id,
+      packId: resource.pack_id,
+      teacherId: resource.teacher_id,
+      resourceKey: resource.resource_key,
+      title: resource.title,
+      resourceType: resource.resource_type,
+      audience: resource.audience,
+      content: resource.content || {},
+      materialId: resource.material_id,
+      createdAt: resource.created_at,
+      updatedAt: resource.updated_at,
+    };
+  }
+
   return {
     isConfigured,
     register,
@@ -851,6 +938,10 @@ const Cloud = (() => {
     setTeacherApproval,
     updateUserAsAdmin,
     loadTeacherContent,
+    saveCoursePack,
+    saveCoursePackResource,
+    deleteCoursePack,
+    deleteCoursePackResource,
     saveMaterial,
     publishMaterial,
     archiveMaterial,

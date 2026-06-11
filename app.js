@@ -351,7 +351,8 @@ let selectedPrepVersion = "康軒";
 let selectedPrepUnit = textbookCatalog["康軒"][0];
 let prepSourceText = "";
 let selectedPreviewStudent = 0;
-let teacherContent = { materials: [], assignments: [] };
+let selectedCoursePackId = "";
+let teacherContent = { materials: [], assignments: [], packs: [] };
 let playerAssignments = [];
 
 const recoveryParams = new URLSearchParams(window.location.hash.slice(1));
@@ -455,7 +456,7 @@ async function refreshTeacherStudents(user) {
     try {
       teacherContent = await Cloud.loadTeacherContent();
     } catch (error) {
-      teacherContent = { materials: [], assignments: [] };
+      teacherContent = { materials: [], assignments: [], packs: [] };
       toast(`教材資料同步失敗：${error.message}`);
     }
   }
@@ -635,9 +636,9 @@ function renderSidebar(user, isTeacher) {
   const teacherNav = [
     ["overview", "▦", "班級總覽"],
     ["students", "♙", "學生學習狀況"],
-    ["missions", "✓", "指派任務"],
     ["prep", "▧", "備課中心"],
-    ["content", "◇", "教材管理"],
+    ["library", "▤", "教材管理"],
+    ["content", "✓", "任務派發中心"],
     ["preview", "◉", "學生端預覽"],
     ["analytics", "⌁", "教學成效"],
   ];
@@ -1257,7 +1258,8 @@ function teacherHeader(user, title, subtitle) {
 function renderTeacherPage(user) {
   if (user.role === "admin") return renderAdminPage(user);
   if (currentPage === "students") return renderStudents(user);
-  if (currentPage === "missions") return renderAssignmentManager(user);
+  if (currentPage === "library") return renderCoursePackLibrary(user);
+  if (currentPage === "missions") return renderMaterialManager(user);
   if (currentPage === "content") return renderMaterialManager(user);
   if (currentPage === "prep") return renderPrepCenter(user);
   if (currentPage === "preview") return renderStudentPreview(user);
@@ -1271,17 +1273,18 @@ function materialStatusLabel(status) {
 
 function renderMaterialManager(user) {
   const materials = teacherContent.materials || [];
+  const assignments = teacherContent.assignments || [];
   const published = materials.filter((item) => item.status === "published").length;
   return `
-    ${teacherHeader(user, "教材管理", "建立題組、設定程度與五大能力分類")}
+    ${teacherHeader(user, "任務派發中心", "建立學生題組，發布後派發給全班、個別學生或小組")}
     <section class="metric-grid">
-      <article class="card metric"><span>教材總數</span><strong>${materials.length} 份</strong><small>包含草稿與封存教材</small></article>
-      <article class="card metric"><span>已發布</span><strong>${published} 份</strong><small>可立即指派給學生</small></article>
-      <article class="card metric"><span>題目總數</span><strong>${materials.reduce((sum, item) => sum + item.questions.length, 0)} 題</strong><small>結構化題目與答案</small></article>
+      <article class="card metric"><span>可派發題組</span><strong>${published} 份</strong><small>學生學習單與課程檢核</small></article>
+      <article class="card metric"><span>已派發任務</span><strong>${assignments.length} 項</strong><small>全班、個別與小組任務</small></article>
+      <article class="card metric"><span>完成紀錄</span><strong>${assignments.reduce((sum, item) => sum + item.completions.length, 0)} 人次</strong><small>學生任務完成紀錄</small></article>
     </section>
     <div class="section-title material-heading">
-      <div><h2>我的教材庫</h2><p>先建立並發布教材，再前往「指派任務」選擇對象。</p></div>
-      <button class="primary-btn open-material-editor">＋ 建立教材</button>
+      <div><h2>學生任務題組</h2><p>可從教材管理的課程包轉入學習單，也可以在此手動建立題組。</p></div>
+      <div class="heading-actions"><button class="secondary-btn open-assignment-editor" ${published ? "" : "disabled"}>＋ 派發任務</button><button class="primary-btn open-material-editor">＋ 手動建立題組</button></div>
     </div>
     ${materials.length ? `
       <section class="material-grid">
@@ -1295,7 +1298,8 @@ function renderMaterialManager(user) {
               <p>${escapeHTML(material.description || "尚未填寫教材說明")}</p>
               <div class="material-meta"><span>${material.questions.length} 題</span><span>更新 ${new Date(material.updatedAt).toLocaleDateString("zh-TW")}</span></div>
               <footer>
-                <button class="secondary-btn edit-material" data-material="${material.id}">編輯教材</button>
+                <button class="secondary-btn edit-material" data-material="${material.id}">編輯題組</button>
+                ${material.status === "published" ? `<button class="primary-btn assign-material" data-material="${material.id}">派發任務</button>` : ""}
                 ${material.status === "draft" ? `<button class="primary-btn publish-material" data-material="${material.id}">發布並指派</button>` : ""}
                 ${material.status !== "archived" ? `<button class="ghost-btn archive-material" data-material="${material.id}">封存</button>` : ""}
               </footer>
@@ -1303,8 +1307,133 @@ function renderMaterialManager(user) {
         }).join("")}
       </section>
     ` : `
-      <section class="card empty-page"><div><div class="big-icon">◇</div><h2>建立第一份教材</h2><p style="color:var(--muted)">輸入題目、答案與選項，發布後即可指派給學生。</p><button class="primary-btn open-material-editor">建立教材</button></div></section>
+      <section class="card empty-page"><div><div class="big-icon">✓</div><h2>建立第一份學生題組</h2><p style="color:var(--muted)">可由課程包轉入，或手動輸入題目後派發。</p><button class="primary-btn open-material-editor">建立題組</button></div></section>
     `}`;
+}
+
+function renderCoursePackLibrary(user) {
+  const packs = teacherContent.packs || [];
+  return `
+    ${teacherHeader(user, "教材管理", "以版本、單元或課程名稱整理教師備課資料與課程包")}
+    <section class="course-library-hero">
+      <div><span class="quest-eyebrow">COURSE PACK LIBRARY</span><h2>我的備課資料夾</h2><p>備課中心挑選的上課素材、學習單與檢核題，都能整理到對應課程包。</p></div>
+      <button class="primary-btn open-course-pack-editor">＋ 新增課程包資料夾</button>
+    </section>
+    <section class="course-pack-grid">
+      ${packs.length ? packs.map((pack) => {
+        const teachingCount = pack.resources.filter((item) => item.resourceType === "teaching_material").length;
+        const studentCount = pack.resources.length - teachingCount;
+        return `<article class="course-pack-folder">
+          <header><span class="folder-icon">▰</span><button class="ghost-btn delete-course-pack" data-pack="${pack.id}">刪除</button></header>
+          <span class="mission-tag">${escapeHTML(pack.textbookVersion || "自編課程")}・${escapeHTML(pack.unitName || "未設定單元")}</span>
+          <h3>${escapeHTML(pack.courseName || pack.title)}</h3>
+          <p>${escapeHTML(pack.description || "尚未加入課程說明")}</p>
+          <div class="pack-counts"><span>上課素材 ${teachingCount}</span><span>學習／檢核 ${studentCount}</span></div>
+          <footer><button class="secondary-btn open-course-pack" data-pack="${pack.id}">開啟課程包</button><button class="primary-btn add-manual-resource" data-pack="${pack.id}">＋ 新增資源</button></footer>
+        </article>`;
+      }).join("") : `<article class="card empty-page course-pack-empty"><div><div class="big-icon">▤</div><h2>建立第一個課程包</h2><p>可依教科書版本、單元或自訂課程名稱建立資料夾。</p><button class="primary-btn open-course-pack-editor">新增課程包資料夾</button></div></article>`}
+    </section>`;
+}
+
+function renderCoursePackEditor(pack = null) {
+  return `<div class="game-modal admin-edit-modal" id="course-pack-editor-modal">
+    <article class="game-card admin-edit-card">
+      <header><div><span class="mission-tag">課程包資料夾</span><h2>${pack ? "編輯課程包" : "新增課程包"}</h2></div><button class="ghost-btn close-course-pack-editor">✕</button></header>
+      <form id="course-pack-form">
+        <input type="hidden" name="id" value="${pack?.id || ""}" />
+        <div class="form-grid">
+          <div class="field full"><label>資料夾名稱</label><input name="title" value="${escapeHTML(pack?.title || `${selectedPrepVersion} ${selectedPrepUnit}`)}" required /></div>
+          <div class="field"><label>教科書版本</label><input name="textbookVersion" value="${escapeHTML(pack?.textbookVersion || selectedPrepVersion)}" /></div>
+          <div class="field"><label>單元</label><input name="unitName" value="${escapeHTML(pack?.unitName || selectedPrepUnit)}" /></div>
+          <div class="field full"><label>課程名稱</label><input name="courseName" value="${escapeHTML(pack?.courseName || selectedPrepUnit)}" placeholder="例：Unit 1 自我介紹課程包" required /></div>
+          <div class="field full"><label>課程說明</label><textarea name="description" rows="3" placeholder="本課的學習目標與使用方式">${escapeHTML(pack?.description || "")}</textarea></div>
+        </div>
+        <div class="editor-actions"><button class="ghost-btn close-course-pack-editor" type="button">取消</button><button class="primary-btn" type="submit">儲存課程包</button></div>
+      </form>
+    </article>
+  </div>`;
+}
+
+function renderAddToCoursePackModal(resourceKey) {
+  const packs = teacherContent.packs || [];
+  const files = prepResourceFiles(resourceKey, prepUnitProfile(selectedPrepVersion, selectedPrepUnit));
+  return `<div class="game-modal admin-edit-modal" id="add-to-pack-modal">
+    <article class="game-card admin-edit-card">
+      <header><div><span class="mission-tag">加入課程包</span><h2>${resourceKey === "differentiated" ? "加入三份差異化學習單" : escapeHTML(files[0].title.split("｜").pop())}</h2></div><button class="ghost-btn close-add-to-pack">✕</button></header>
+      ${packs.length ? `<form id="add-to-pack-form">
+        <input type="hidden" name="resourceKey" value="${resourceKey}" />
+        <div class="field"><label>選擇課程包資料夾</label><select name="packId">${packs.map((pack) => `<option value="${pack.id}" ${pack.id === selectedCoursePackId ? "selected" : ""}>${escapeHTML(pack.textbookVersion)}・${escapeHTML(pack.unitName)}｜${escapeHTML(pack.courseName || pack.title)}</option>`).join("")}</select></div>
+        <div class="pack-file-preview">${files.map((file) => `<div><span>${file.icon}</span><p><b>${escapeHTML(file.title.split("｜").pop())}</b><small>${resourceTypeLabel(file.resourceType)}・${file.content.questions?.length || 0} 題</small></p></div>`).join("")}</div>
+        <div class="editor-actions"><button class="ghost-btn close-add-to-pack" type="button">取消</button><button class="primary-btn" type="submit">加入所選課程包</button></div>
+      </form>` : `<div class="empty-hint pack-modal-empty"><p>目前還沒有課程包資料夾，請先建立一個。</p><button class="primary-btn create-pack-from-prep">＋ 建立課程包</button></div>`}
+    </article>
+  </div>`;
+}
+
+function renderResourcePreviewModal(resourceKey) {
+  const files = prepResourceFiles(resourceKey, prepUnitProfile(selectedPrepVersion, selectedPrepUnit));
+  return `<div class="game-modal admin-edit-modal" id="resource-preview-modal">
+    <article class="game-card admin-edit-card resource-preview-card">
+      <header><div><span class="mission-tag">課程資源預覽</span><h2>${resourceKey === "differentiated" ? "差異化課程包：三份課程檔案" : escapeHTML(files[0].title.split("｜").pop())}</h2></div><button class="ghost-btn close-resource-preview">✕</button></header>
+      <div class="resource-file-tabs">
+        ${files.map((file, index) => `<article class="resource-file-detail">
+          <div class="resource-file-heading"><span>${file.icon}</span><div><small>${resourceTypeLabel(file.resourceType)}</small><h3>${escapeHTML(file.title.split("｜").pop())}</h3></div></div>
+          ${renderResourceContent(file.content)}
+        </article>`).join("")}
+      </div>
+      <div class="editor-actions"><button class="ghost-btn close-resource-preview">關閉</button><button class="primary-btn preview-add-to-pack" data-resource-key="${resourceKey}">加入課程包</button></div>
+    </article>
+  </div>`;
+}
+
+function renderCoursePackDetail(pack) {
+  return `<div class="game-modal admin-edit-modal" id="course-pack-detail-modal">
+    <article class="game-card admin-edit-card course-pack-detail-card">
+      <header><div><span class="mission-tag">${escapeHTML(pack.textbookVersion)}・${escapeHTML(pack.unitName)}</span><h2>${escapeHTML(pack.courseName || pack.title)}</h2></div><button class="ghost-btn close-course-pack-detail">✕</button></header>
+      <div class="course-pack-detail-toolbar"><p>${escapeHTML(pack.description || "此課程包尚未填寫說明。")}</p><button class="primary-btn add-manual-resource" data-pack="${pack.id}">＋ 手動新增課程資源</button></div>
+      <div class="course-resource-list">
+        ${pack.resources.length ? pack.resources.map((resource) => `<article class="course-resource-row">
+          <span class="course-resource-icon">${resource.audience === "teacher" ? "🧑‍🏫" : resource.resourceType === "assessment" ? "✅" : "📝"}</span>
+          <div><small>${resourceTypeLabel(resource.resourceType)}</small><h3>${escapeHTML(resource.title)}</h3><p>${escapeHTML(resource.content.goal || resource.content.instructions || resource.content.teacherGuide || "")}</p></div>
+          <div class="course-resource-actions"><button class="secondary-btn view-saved-resource" data-resource="${resource.id}">查看內容</button>${resource.audience === "student" ? `<button class="primary-btn convert-resource-task" data-resource="${resource.id}">建立派發題組</button>` : ""}<button class="ghost-btn delete-course-resource" data-resource="${resource.id}">移除</button></div>
+        </article>`).join("") : `<div class="empty-hint"><p>此課程包尚未加入資源，可回到備課中心挑選，或手動新增。</p></div>`}
+      </div>
+    </article>
+  </div>`;
+}
+
+function renderManualResourceEditor(packId) {
+  return `<div class="game-modal admin-edit-modal" id="manual-resource-modal">
+    <article class="game-card admin-edit-card">
+      <header><div><span class="mission-tag">手動新增</span><h2>新增課程資源</h2></div><button class="ghost-btn close-manual-resource">✕</button></header>
+      <form id="manual-resource-form">
+        <input type="hidden" name="packId" value="${packId}" />
+        <div class="form-grid">
+          <div class="field full"><label>資源名稱</label><input name="title" required placeholder="例：Unit 1 上課簡報重點" /></div>
+          <div class="field"><label>資源類型</label><select name="resourceType"><option value="teaching_material">教師上課素材</option><option value="worksheet">學生學習單</option><option value="assessment">學習檢核</option></select></div>
+          <div class="field"><label>使用對象</label><select name="audience"><option value="teacher">教師使用</option><option value="student">學生使用／可轉任務</option></select></div>
+          <div class="field full"><label>內容</label><textarea name="content" rows="8" required placeholder="輸入教學步驟、學習單內容、題目或檢核說明"></textarea></div>
+        </div>
+        <div class="editor-actions"><button class="ghost-btn close-manual-resource" type="button">取消</button><button class="primary-btn" type="submit">新增至課程包</button></div>
+      </form>
+    </article>
+  </div>`;
+}
+
+function findCoursePackResource(resourceId) {
+  return (teacherContent.packs || [])
+    .flatMap((pack) => pack.resources)
+    .find((resource) => resource.id === resourceId);
+}
+
+function renderSavedResourcePreview(resource) {
+  return `<div class="game-modal admin-edit-modal" id="saved-resource-modal">
+    <article class="game-card admin-edit-card resource-preview-card">
+      <header><div><span class="mission-tag">${resourceTypeLabel(resource.resourceType)}</span><h2>${escapeHTML(resource.title)}</h2></div><button class="ghost-btn close-saved-resource">✕</button></header>
+      <article class="resource-file-detail">${renderResourceContent(resource.content)}</article>
+      <div class="editor-actions"><button class="ghost-btn close-saved-resource">關閉</button>${resource.audience === "student" ? `<button class="primary-btn convert-resource-task" data-resource="${resource.id}">建立派發題組</button>` : ""}</div>
+    </article>
+  </div>`;
 }
 
 function prepUnitProfile(version, unit) {
@@ -1373,10 +1502,28 @@ function prepLessonTerms(profile) {
 }
 
 function prepWordVisual(word) {
+  const commonVisuals = {
+    hello: "👋",
+    hi: "👋",
+    goodbye: "🌇",
+    bye: "🌇",
+    please: "🙏",
+    thanks: "💝",
+    thank: "💝",
+    yes: "✅",
+    no: "❌",
+    friend: "🤝",
+    teacher: "🧑‍🏫",
+    student: "🧑‍🎓",
+    school: "🏫",
+    book: "📘",
+  };
+  const normalized = word.toLowerCase().trim();
+  if (commonVisuals[normalized]) return commonVisuals[normalized];
   const themedWord = worldThemes
     .flatMap((theme) => theme.words)
-    .find((item) => item[1].toLowerCase() === word.toLowerCase());
-  return themedWord?.[0] || "🖼️";
+    .find((item) => item[1].toLowerCase() === normalized);
+  return themedWord?.[0] || "🔤";
 }
 
 function prepQuestionOptions(answer, lessonWords, fallbackWords) {
@@ -1476,6 +1623,135 @@ function prepResourceMaterial(resourceKey, profile) {
   };
 }
 
+function prepResourceFiles(resourceKey, profile) {
+  const material = prepResourceMaterial(resourceKey, profile);
+  const words = prepLessonTerms(profile).map((term) => term.english).filter(Boolean);
+  const baseContent = {
+    goal: profile.goal,
+    vocabulary: words,
+    sentence: profile.sentence,
+    questions: material.questions,
+  };
+  if (resourceKey === "differentiated") {
+    return [
+      {
+        ...material,
+        resourceKey: "differentiated-support",
+        title: "需要支持版學習單",
+        resourceType: "worksheet",
+        audience: "student",
+        icon: "🌱",
+        content: {
+          ...baseContent,
+          level: "需要支持",
+          teacherGuide: "先教 4 個核心字詞，逐張指圖示範，保留中文提示與句首。",
+          activities: ["看圖圈選正確單字", "單字與圖片連線", "跟讀後替換一個字詞完成句子"],
+          check: "能辨識 4 個核心字詞，並在提示下完成 1 句口語表達。",
+          questions: material.questions.slice(0, 4),
+        },
+      },
+      {
+        ...material,
+        resourceKey: "differentiated-standard",
+        title: "符合程度版學習單",
+        resourceType: "worksheet",
+        audience: "student",
+        icon: "🚀",
+        content: {
+          ...baseContent,
+          level: "符合程度",
+          teacherGuide: "提供關鍵字但不提供完整答案，安排兩人資訊差與三輪問答。",
+          activities: ["完成字詞分類", "依圖片寫出完整句", "與同學完成三次問答並記錄答案"],
+          check: "能正確使用核心字詞，並以完整句完成問答。",
+          questions: material.questions.slice(0, 7),
+        },
+      },
+      {
+        ...material,
+        resourceKey: "differentiated-challenge",
+        title: "進階挑戰版學習單",
+        resourceType: "worksheet",
+        audience: "student",
+        icon: "🏆",
+        content: {
+          ...baseContent,
+          level: "進階挑戰",
+          teacherGuide: "移除句型支架，要求加入原因、數量或第三人稱資訊。",
+          activities: ["自行設計兩個訪問題目", "訪問兩位同學並整理結果", "使用 2–3 句英語口頭報告"],
+          check: "能靈活替換語料、補充新訊息並完成自主表達。",
+          questions: material.questions,
+        },
+      },
+    ];
+  }
+  const definitions = {
+    flashcards: {
+      resourceType: "teaching_material",
+      audience: "teacher",
+      content: {
+        ...baseContent,
+        usage: ["暖身：快速閃卡命名", "分組：圖卡與字卡配對", "口說：抽卡後套用本課句型"],
+        cards: words.map((word) => ({ word, visual: prepWordVisual(word) })),
+      },
+    },
+    listening: {
+      resourceType: "teaching_material",
+      audience: "teacher",
+      content: {
+        ...baseContent,
+        usage: ["第一輪只聽單字並指圖", "第二輪聽句子選答案", "第三輪兩人互相朗讀與判斷"],
+        audioScript: material.questions.map((question) => question.speech).filter(Boolean),
+      },
+    },
+    checkup: {
+      resourceType: "assessment",
+      audience: "student",
+      content: {
+        ...baseContent,
+        instructions: "完成本課字詞與句型複習題，教師可查看答對率與易錯內容。",
+        check: "80% 以上表示達成本課目標；未達 80% 建議改派支持版學習單。",
+      },
+    },
+  };
+  const definition = definitions[resourceKey] || definitions.checkup;
+  return [{
+    ...material,
+    resourceKey,
+    ...definition,
+  }];
+}
+
+function resourceTypeLabel(type) {
+  return {
+    teaching_material: "教師上課素材",
+    worksheet: "學生學習單",
+    assessment: "學習檢核",
+  }[type] || "課程資源";
+}
+
+function renderResourceContent(content = {}) {
+  const list = (items) => items?.length
+    ? `<ul>${items.map((item) => `<li>${escapeHTML(typeof item === "string" ? item : item.word || "")}</li>`).join("")}</ul>`
+    : "";
+  return `
+    ${content.level ? `<div class="resource-detail-row"><b>適用層次</b><p>${escapeHTML(content.level)}</p></div>` : ""}
+    ${content.goal ? `<div class="resource-detail-row"><b>學習目標</b><p>${escapeHTML(content.goal)}</p></div>` : ""}
+    ${content.vocabulary?.length ? `<div class="resource-detail-row"><b>核心字詞</b><div class="prep-term-list">${content.vocabulary.map((word) => `<span>${escapeHTML(word)}</span>`).join("")}</div></div>` : ""}
+    ${content.sentence ? `<div class="resource-detail-row"><b>核心句型</b><p>${escapeHTML(content.sentence)}</p></div>` : ""}
+    ${content.teacherGuide ? `<div class="resource-detail-row"><b>教師操作方式</b><p>${escapeHTML(content.teacherGuide)}</p></div>` : ""}
+    ${content.usage?.length ? `<div class="resource-detail-row"><b>上課使用步驟</b>${list(content.usage)}</div>` : ""}
+    ${content.cards?.length ? `<div class="resource-detail-row"><b>圖像字卡</b><div class="resource-card-sheet">${content.cards.map((card) => `
+      <article>
+        <span>${escapeHTML(card.visual || "🔤")}</span>
+        <strong>${escapeHTML(card.word || "")}</strong>
+        ${card.meaning ? `<small>${escapeHTML(card.meaning)}</small>` : ""}
+      </article>`).join("")}</div></div>` : ""}
+    ${content.activities?.length ? `<div class="resource-detail-row"><b>學生學習內容</b>${list(content.activities)}</div>` : ""}
+    ${content.audioScript?.length ? `<div class="resource-detail-row"><b>聽力素材腳本</b>${list(content.audioScript)}</div>` : ""}
+    ${content.check ? `<div class="resource-detail-row"><b>學習檢核標準</b><p>${escapeHTML(content.check)}</p></div>` : ""}
+    ${content.questions?.length ? `<div class="resource-detail-row"><b>內含題目</b><ol>${content.questions.slice(0, 10).map((question) => `<li>${escapeHTML(question.prompt)}</li>`).join("")}</ol></div>` : ""}`;
+}
+
 function prepSourceInsights(profile) {
   const terms = prepLessonTerms(profile);
   const termLabels = terms.map((term) =>
@@ -1530,15 +1806,16 @@ function renderPrepCenter(user) {
     <div class="section-title"><div><h2>上課素材與教材資源包</h2><p>可直接搭配目前單元使用，再依班級狀況微調。</p></div></div>
     <section class="resource-pack-grid">
       ${["flashcards", "listening", "differentiated", "checkup"].map((resourceKey) => {
-        const resource = prepResourceMaterial(resourceKey, profile);
-        const displayTitle = resource.title.split("｜").pop();
+        const files = prepResourceFiles(resourceKey, profile);
+        const resource = files[0];
+        const displayTitle = resourceKey === "differentiated" ? "差異化課程包" : resource.title.split("｜").pop();
         return `<article class="card resource-pack">
           <span>${resource.icon}</span><h3>${displayTitle}</h3><p>${escapeHTML(resource.description.split("。").slice(-2).join("。"))}</p>
           <ul>${resource.highlights.map((item) => `<li>${escapeHTML(item)}</li>`).join("")}</ul>
-          <small>已依 ${escapeHTML(selectedPrepUnit)} 產生 ${resource.questions.length} 題素材</small>
+          <small>${resourceKey === "differentiated" ? "內含 3 份不同程度學習單" : `已依 ${escapeHTML(selectedPrepUnit)} 產生完整內容`}</small>
           <div class="resource-pack-actions">
-            <button class="secondary-btn prep-resource-edit" data-resource-key="${resourceKey}">預覽與編輯</button>
-            <button class="primary-btn prep-resource-assign" data-resource-key="${resourceKey}">直接建立並派發</button>
+            <button class="secondary-btn prep-resource-preview" data-resource-key="${resourceKey}">查看實際內容</button>
+            <button class="primary-btn prep-resource-add" data-resource-key="${resourceKey}">加入課程包</button>
           </div>
         </article>`;
       }).join("")}
@@ -1570,7 +1847,7 @@ function renderStudentPreview(user) {
     <section class="preview-toolbar card">
       <div class="field preview-student-field"><label>預覽學生</label><select id="preview-student">${students.map((student, index) => `<option value="${index}" ${index === selectedPreviewStudent ? "selected" : ""}>${escapeHTML(student.name)}（${escapeHTML(student.seat)}號）</option>`).join("") || '<option>目前沒有學生</option>'}</select></div>
       <div><b>預覽身分：${escapeHTML(previewStudent?.name || "示範學生")}</b><p>此畫面為唯讀預覽，顯示目前已設定任務與學生實際能力，不會產生學習紀錄。</p></div>
-      <button class="secondary-btn" data-page="content">返回教材管理微調</button>
+      <button class="secondary-btn" data-page="content">前往任務派發中心微調</button>
     </section>
     <section class="device-preview">
       <div class="device-preview-bar"><span></span><b>WonderGo 學生首頁</b><em>唯讀預覽</em></div>
@@ -2119,7 +2396,7 @@ function renderAssignmentManager(user) {
       <div><h2>班級任務</h2><p>可指派全班、單一學生，或勾選多位學生組成這次任務小組。</p></div>
       <button class="primary-btn open-assignment-editor" ${materials.length ? "" : "disabled"}>＋ 指派任務</button>
     </div>
-    ${materials.length ? "" : `<div class="insight focus"><span>!</span><div><b>${drafts.length ? `已有 ${drafts.length} 份草稿教材，尚未發布` : "請先建立教材"}</b><p>教材必須發布後才能指派給學生。</p><button class="secondary-btn go-material-manager">前往教材管理發布</button></div></div>`}
+    ${materials.length ? "" : `<div class="insight focus"><span>!</span><div><b>${drafts.length ? `已有 ${drafts.length} 份草稿題組，尚未發布` : "請先建立學生題組"}</b><p>題組必須發布後才能指派給學生。</p><button class="secondary-btn go-material-manager">前往任務派發中心發布</button></div></div>`}
     <section class="assignment-list">
       ${assignments.length ? assignments.map((assignment) => {
         const material = teacherContent.materials.find((item) => item.id === assignment.materialId);
@@ -3295,7 +3572,7 @@ function bindMaterialEditorEvents() {
       });
       await refreshTeacherStudents(currentUser());
       closeMaterialEditor();
-      if (intent === "assign") currentPage = "missions";
+      if (intent === "assign") currentPage = "content";
       render();
       if (intent === "assign") {
         document.body.insertAdjacentHTML("beforeend", renderAssignmentEditor(currentUser()));
@@ -3375,6 +3652,197 @@ function bindAssignmentEditorEvents() {
       button.textContent = "重新指派";
       toast(`指派失敗：${error.message}`);
     }
+  });
+}
+
+function bindCoursePackEvents(root = document) {
+  const close = (selector) => document.querySelector(selector)?.remove();
+  root.querySelectorAll(".open-course-pack-editor").forEach((button) => {
+    button.addEventListener("click", () => {
+      document.body.insertAdjacentHTML("beforeend", renderCoursePackEditor());
+      bindCoursePackEvents(document.getElementById("course-pack-editor-modal"));
+    });
+  });
+  root.querySelectorAll(".close-course-pack-editor").forEach((button) =>
+    button.addEventListener("click", () => close("#course-pack-editor-modal")));
+  root.querySelector("#course-pack-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const button = event.currentTarget.querySelector('[type="submit"]');
+    button.disabled = true;
+    button.textContent = "儲存中...";
+    try {
+      const pack = await Cloud.saveCoursePack({
+        id: form.get("id"),
+        title: form.get("title").trim(),
+        textbookVersion: form.get("textbookVersion").trim(),
+        unitName: form.get("unitName").trim(),
+        courseName: form.get("courseName").trim(),
+        description: form.get("description").trim(),
+      });
+      selectedCoursePackId = pack.id;
+      await refreshTeacherStudents(currentUser());
+      document.getElementById("course-pack-editor-modal")?.remove();
+      currentPage = "library";
+      render();
+      toast("課程包資料夾已建立。");
+    } catch (error) {
+      button.disabled = false;
+      button.textContent = "重新儲存";
+      toast(`課程包儲存失敗：${error.message}`);
+    }
+  });
+  root.querySelectorAll(".create-pack-from-prep").forEach((button) =>
+    button.addEventListener("click", () => {
+      document.getElementById("add-to-pack-modal")?.remove();
+      document.body.insertAdjacentHTML("beforeend", renderCoursePackEditor());
+      bindCoursePackEvents(document.getElementById("course-pack-editor-modal"));
+    }));
+  root.querySelectorAll(".close-add-to-pack").forEach((button) =>
+    button.addEventListener("click", () => close("#add-to-pack-modal")));
+  root.querySelector("#add-to-pack-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const button = event.currentTarget.querySelector('[type="submit"]');
+    const resourceKey = form.get("resourceKey");
+    const packId = form.get("packId");
+    const files = prepResourceFiles(
+      resourceKey,
+      prepUnitProfile(selectedPrepVersion, selectedPrepUnit),
+    );
+    button.disabled = true;
+    button.textContent = `正在加入 ${files.length} 份檔案...`;
+    try {
+      for (const file of files) {
+        await Cloud.saveCoursePackResource({
+          packId,
+          resourceKey: file.resourceKey,
+          title: file.title.split("｜").pop(),
+          resourceType: file.resourceType,
+          audience: file.audience,
+          content: file.content,
+        });
+      }
+      selectedCoursePackId = packId;
+      await refreshTeacherStudents(currentUser());
+      document.getElementById("add-to-pack-modal")?.remove();
+      document.getElementById("resource-preview-modal")?.remove();
+      toast(`${files.length} 份課程資源已加入課程包。`);
+    } catch (error) {
+      button.disabled = false;
+      button.textContent = "重新加入";
+      toast(`加入失敗：${error.message}`);
+    }
+  });
+  root.querySelectorAll(".close-resource-preview").forEach((button) =>
+    button.addEventListener("click", () => close("#resource-preview-modal")));
+  root.querySelectorAll(".preview-add-to-pack").forEach((button) =>
+    button.addEventListener("click", () => {
+      document.body.insertAdjacentHTML(
+        "beforeend",
+        renderAddToCoursePackModal(button.dataset.resourceKey),
+      );
+      bindCoursePackEvents(document.getElementById("add-to-pack-modal"));
+    }));
+  root.querySelectorAll(".open-course-pack").forEach((button) => {
+    button.addEventListener("click", () => {
+      const pack = (teacherContent.packs || []).find((item) => item.id === button.dataset.pack);
+      if (!pack) return;
+      selectedCoursePackId = pack.id;
+      document.body.insertAdjacentHTML("beforeend", renderCoursePackDetail(pack));
+      bindCoursePackEvents(document.getElementById("course-pack-detail-modal"));
+    });
+  });
+  root.querySelectorAll(".close-course-pack-detail").forEach((button) =>
+    button.addEventListener("click", () => close("#course-pack-detail-modal")));
+  root.querySelectorAll(".add-manual-resource").forEach((button) => {
+    button.addEventListener("click", () => {
+      document.body.insertAdjacentHTML(
+        "beforeend",
+        renderManualResourceEditor(button.dataset.pack),
+      );
+      bindCoursePackEvents(document.getElementById("manual-resource-modal"));
+    });
+  });
+  root.querySelectorAll(".close-manual-resource").forEach((button) =>
+    button.addEventListener("click", () => close("#manual-resource-modal")));
+  root.querySelector("#manual-resource-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const button = event.currentTarget.querySelector('[type="submit"]');
+    button.disabled = true;
+    try {
+      await Cloud.saveCoursePackResource({
+        packId: form.get("packId"),
+        resourceKey: `manual-${Date.now()}`,
+        title: form.get("title").trim(),
+        resourceType: form.get("resourceType"),
+        audience: form.get("audience"),
+        content: {
+          goal: form.get("content").trim(),
+          instructions: form.get("content").trim(),
+          questions: [],
+        },
+      });
+      await refreshTeacherStudents(currentUser());
+      document.getElementById("manual-resource-modal")?.remove();
+      document.getElementById("course-pack-detail-modal")?.remove();
+      const pack = teacherContent.packs.find((item) => item.id === form.get("packId"));
+      if (pack) {
+        document.body.insertAdjacentHTML("beforeend", renderCoursePackDetail(pack));
+        bindCoursePackEvents(document.getElementById("course-pack-detail-modal"));
+      }
+      toast("課程資源已新增。");
+    } catch (error) {
+      button.disabled = false;
+      toast(`新增失敗：${error.message}`);
+    }
+  });
+  root.querySelectorAll(".view-saved-resource").forEach((button) => {
+    button.addEventListener("click", () => {
+      const resource = findCoursePackResource(button.dataset.resource);
+      if (!resource) return;
+      document.body.insertAdjacentHTML("beforeend", renderSavedResourcePreview(resource));
+      bindCoursePackEvents(document.getElementById("saved-resource-modal"));
+    });
+  });
+  root.querySelectorAll(".close-saved-resource").forEach((button) =>
+    button.addEventListener("click", () => close("#saved-resource-modal")));
+  root.querySelectorAll(".convert-resource-task").forEach((button) => {
+    button.addEventListener("click", () => {
+      const resource = findCoursePackResource(button.dataset.resource);
+      if (!resource) return;
+      const questions = resource.content.questions || [];
+      document.body.insertAdjacentHTML("beforeend", renderMaterialEditor({
+        title: resource.title,
+        description: resource.content.goal || resource.content.instructions || "",
+        ability: resource.resourceType === "assessment" ? "word" : "story",
+        cefrLevel: "Pre-A1",
+        status: "draft",
+        questions,
+      }));
+      bindMaterialEditorEvents();
+      if (!questions.length) toast("此手動資源尚無題目，請在題組編輯器中新增題目後發布。");
+    });
+  });
+  root.querySelectorAll(".delete-course-resource").forEach((button) => {
+    button.addEventListener("click", async () => {
+      if (!window.confirm("確定從課程包移除這份資源嗎？")) return;
+      await Cloud.deleteCoursePackResource(button.dataset.resource);
+      await refreshTeacherStudents(currentUser());
+      document.getElementById("course-pack-detail-modal")?.remove();
+      render();
+      toast("課程資源已移除。");
+    });
+  });
+  root.querySelectorAll(".delete-course-pack").forEach((button) => {
+    button.addEventListener("click", async () => {
+      if (!window.confirm("確定刪除整個課程包資料夾嗎？其中資源也會一併刪除。")) return;
+      await Cloud.deleteCoursePack(button.dataset.pack);
+      await refreshTeacherStudents(currentUser());
+      render();
+      toast("課程包已刪除。");
+    });
   });
 }
 
@@ -3676,43 +4144,23 @@ function bindEvents() {
     }
   });
 
-  document.querySelectorAll(".prep-resource-edit").forEach((button) => {
+  document.querySelectorAll(".prep-resource-preview").forEach((button) => {
     button.addEventListener("click", () => {
-      const material = prepResourceMaterial(
-        button.dataset.resourceKey,
-        prepUnitProfile(selectedPrepVersion, selectedPrepUnit),
+      document.body.insertAdjacentHTML(
+        "beforeend",
+        renderResourcePreviewModal(button.dataset.resourceKey),
       );
-      document.body.insertAdjacentHTML("beforeend", renderMaterialEditor(material));
-      bindMaterialEditorEvents();
+      bindCoursePackEvents(document.getElementById("resource-preview-modal"));
     });
   });
 
-  document.querySelectorAll(".prep-resource-assign").forEach((button) => {
-    button.addEventListener("click", async () => {
-      const originalText = button.textContent;
-      button.disabled = true;
-      button.textContent = "正在建立...";
-      try {
-        const material = prepResourceMaterial(
-          button.dataset.resourceKey,
-          prepUnitProfile(selectedPrepVersion, selectedPrepUnit),
-        );
-        const savedMaterial = await Cloud.saveMaterial({
-          ...material,
-          status: "published",
-        });
-        await refreshTeacherStudents(currentUser());
-        document.body.insertAdjacentHTML(
-          "beforeend",
-          renderAssignmentEditor(currentUser(), "", savedMaterial.id),
-        );
-        bindAssignmentEditorEvents();
-        toast("課程資源已建立，請選擇派發對象與獎勵。");
-      } catch (error) {
-        button.disabled = false;
-        button.textContent = originalText;
-        toast(`資源建立失敗：${error.message}`);
-      }
+  document.querySelectorAll(".prep-resource-add").forEach((button) => {
+    button.addEventListener("click", () => {
+      document.body.insertAdjacentHTML(
+        "beforeend",
+        renderAddToCoursePackModal(button.dataset.resourceKey),
+      );
+      bindCoursePackEvents(document.getElementById("add-to-pack-modal"));
     });
   });
 
@@ -3776,7 +4224,7 @@ function bindEvents() {
       );
       bindAssignmentEditorEvents();
     } else {
-      toast("請先在教材管理發布一份教材。");
+      toast("請先在任務派發中心發布一份學生題組。");
     }
   }));
 
@@ -3818,7 +4266,7 @@ function bindEvents() {
       try {
         await Cloud.publishMaterial(button.dataset.material);
         await refreshTeacherStudents(currentUser());
-        currentPage = "missions";
+        currentPage = "content";
         render();
         document.body.insertAdjacentHTML("beforeend", renderAssignmentEditor(currentUser()));
         bindAssignmentEditorEvents();
@@ -3835,6 +4283,16 @@ function bindEvents() {
     button.addEventListener("click", () => {
       currentPage = "content";
       render();
+    });
+  });
+
+  document.querySelectorAll(".assign-material").forEach((button) => {
+    button.addEventListener("click", () => {
+      document.body.insertAdjacentHTML(
+        "beforeend",
+        renderAssignmentEditor(currentUser(), "", button.dataset.material),
+      );
+      bindAssignmentEditorEvents();
     });
   });
 
@@ -3861,6 +4319,8 @@ function bindEvents() {
       }
     });
   });
+
+  bindCoursePackEvents();
 
   document.querySelectorAll(".approve-teacher").forEach((button) => {
     button.addEventListener("click", async () => {
