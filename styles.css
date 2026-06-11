@@ -1619,6 +1619,12 @@ button {
   font-weight: 800;
 }
 
+.ability-gain-note {
+  margin: 4px 0 14px;
+  color: var(--green);
+  font-weight: 900;
+}
+
 .training-card {
   position: relative;
   min-height: 220px;
@@ -2180,6 +2186,10 @@ button {
   margin: 3px 0 0;
 }
 
+.prep-plan-card.differentiation p strong {
+  color: var(--ink);
+}
+
 .resource-pack-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -2205,6 +2215,35 @@ button {
   color: var(--muted);
   font-size: 12px;
   line-height: 1.6;
+}
+
+.resource-pack ul {
+  display: grid;
+  gap: 6px;
+  min-height: 86px;
+  margin: 10px 0;
+  padding: 12px 12px 12px 30px;
+  border-radius: 13px;
+  color: #554f6d;
+  background: #f7f5fc;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.resource-pack > small {
+  color: var(--green);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.resource-pack-actions {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.resource-pack-actions button {
+  width: 100%;
 }
 
 .preview-toolbar {
@@ -4241,9 +4280,12 @@ td {
     opacity: 0.72;
   }
 
-  .theme-badge-grid,
-  .resource-pack-grid {
+  .theme-badge-grid {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .resource-pack-grid {
+    grid-template-columns: 1fr;
   }
 
   .momentum-strip article {

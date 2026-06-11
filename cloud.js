@@ -728,6 +728,7 @@ const Cloud = (() => {
     return {
       ...result.profile,
       awardedXp: result.awarded_xp,
+      abilityGain: result.ability_gain,
       ...(await loadPlayerLearningData()),
     };
   }
@@ -756,6 +757,7 @@ const Cloud = (() => {
     return {
       ...result.profile,
       awardedXp: result.awarded_xp,
+      abilityGain: result.ability_gain,
       baseXp: result.base_xp,
       repeatCount: result.repeat_count,
       isRepeat: result.is_repeat,

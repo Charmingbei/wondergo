@@ -1353,8 +1353,8 @@ function prepUnitProfile(version, unit) {
     },
     daily: {
       goal: "能理解本單元核心字詞與句型，並在生活情境中完成簡易溝通。",
-      vocabulary: "依單元教材擷取 6–10 個核心字詞",
-      sentence: "依課本對話整理一組問句與回答句型",
+      vocabulary: "hello, goodbye, please, thanks, yes, no",
+      sentence: "Hello! / Thank you.",
       warmup: "以圖片、動作或情境問題喚起先備知識。",
       task: "設計兩人資訊差任務，讓學生必須使用目標句型完成挑戰。",
     },
@@ -1362,15 +1362,122 @@ function prepUnitProfile(version, unit) {
   return profiles[theme];
 }
 
-function prepSourceInsights(profile) {
+function prepLessonTerms(profile) {
   const uploadedTerms = teachingTermsFromText(prepSourceText).slice(0, 10);
-  const fallbackTerms = profile.vocabulary
+  if (uploadedTerms.length) return uploadedTerms;
+  return profile.vocabulary
     .split(",")
     .map((word) => word.trim())
-    .filter((word) => /^[A-Za-z][A-Za-z '-]+$/.test(word));
-  const terms = uploadedTerms.length
-    ? uploadedTerms
-    : fallbackTerms.map((english) => ({ english, meaning: "" }));
+    .filter((word) => /^[A-Za-z][A-Za-z '-]+$/.test(word))
+    .map((english) => ({ english, meaning: "" }));
+}
+
+function prepWordVisual(word) {
+  const themedWord = worldThemes
+    .flatMap((theme) => theme.words)
+    .find((item) => item[1].toLowerCase() === word.toLowerCase());
+  return themedWord?.[0] || "🖼️";
+}
+
+function prepQuestionOptions(answer, lessonWords, fallbackWords) {
+  return [...new Set([
+    answer,
+    ...lessonWords.filter((word) => word !== answer),
+    ...fallbackWords.filter((word) => word !== answer),
+  ])].slice(0, 4);
+}
+
+function prepResourceMaterial(resourceKey, profile) {
+  const terms = prepLessonTerms(profile);
+  const lessonWords = terms.map((term) => term.english).filter(Boolean);
+  const fallbackWords = ["hello", "friend", "school", "teacher", "book", "apple"];
+  const usableWords = [...new Set([...lessonWords, ...fallbackWords])].slice(0, 10);
+  const makeWordQuestion = (word, index, mode = "image") => {
+    const options = prepQuestionOptions(word, usableWords, fallbackWords);
+    const shuffled = seededShuffle(options, `${resourceKey}:${word}:${index}`);
+    return {
+      visual: mode === "listen" ? "🎧" : prepWordVisual(word),
+      prompt: mode === "listen"
+        ? "聽一聽，選出你聽到的本課單字。"
+        : `看圖選出本課單字「${word}」。`,
+      options: shuffled,
+      answer: shuffled.indexOf(word),
+      speech: mode === "listen" ? word : "",
+    };
+  };
+  const wordQuestions = usableWords.slice(0, 6).map((word, index) =>
+    makeWordQuestion(word, index, resourceKey === "listening" ? "listen" : "image"));
+  const sentenceAnswer = profile.sentence.split("/")[0].trim();
+  const sentenceOptions = [
+    sentenceAnswer,
+    "Hello! Nice to meet you.",
+    "This is my school.",
+    "I can see a book.",
+  ];
+  const sentenceQuestions = usableWords.slice(0, 4).map((word, index) => {
+    const answer = sentenceAnswer.replace("___", word);
+    const options = [
+      answer,
+      ...sentenceOptions.map((sentence) => sentence.replace("___", usableWords[(index + 1) % usableWords.length])),
+    ].filter((option, optionIndex, all) => option && all.indexOf(option) === optionIndex).slice(0, 4);
+    while (options.length < 4) options.push(`I know ${usableWords[options.length]}.`);
+    const shuffled = seededShuffle(options, `${resourceKey}:sentence:${word}`);
+    return {
+      visual: resourceKey === "listening" ? "🎧" : "📝",
+      prompt: resourceKey === "listening"
+        ? "聽完本課句型後，選出相同的句子。"
+        : `選出能正確運用「${word}」的本課句型。`,
+      options: shuffled,
+      answer: shuffled.indexOf(answer),
+      speech: resourceKey === "listening" ? answer : "",
+    };
+  });
+  const resources = {
+    flashcards: {
+      title: "圖像字卡包",
+      description: `本課 ${lessonWords.slice(0, 8).join("、")} 圖像字卡與辨識練習，可用於暖身、配對及口頭抽問。`,
+      ability: "word",
+      icon: "🖼️",
+      highlights: ["本課核心字詞圖卡", "中英配對活動", "可列印暖身任務"],
+      questions: wordQuestions,
+    },
+    listening: {
+      title: "聽力任務包",
+      description: "使用本課字詞與句型，從單字辨音、句子理解到情境回應逐步練習。",
+      ability: "echo",
+      icon: "🎧",
+      highlights: ["核心字詞辨音", "本課句型聽辨", "基礎與挑戰題"],
+      questions: [...wordQuestions, ...sentenceQuestions].slice(0, 10),
+    },
+    differentiated: {
+      title: "差異化課程包",
+      description: "依需要支持、符合程度與進階挑戰三種層次，提供可直接調整的差異化學習單。",
+      ability: "story",
+      icon: "🧩",
+      highlights: ["支持版：圖像與二選一", "標準版：完整句型應用", "挑戰版：移除提示並延伸表達"],
+      questions: [...wordQuestions.slice(0, 3), ...sentenceQuestions].slice(0, 7),
+    },
+    checkup: {
+      title: "課程檢核區",
+      description: "整合本課字詞與句型複習題，可直接發布派發，也可先進入教材編輯器調整。",
+      ability: "word",
+      icon: "✅",
+      highlights: ["課後複習題", "答對率檢核", "可直接派發或編輯"],
+      questions: [...wordQuestions, ...sentenceQuestions].slice(0, 10),
+    },
+  };
+  const resource = resources[resourceKey] || resources.checkup;
+  return {
+    ...resource,
+    title: `${selectedPrepVersion} ${selectedPrepUnit}｜${resource.title}`,
+    description: `${profile.goal} ${resource.description}`,
+    cefrLevel: "Pre-A1",
+    status: "draft",
+  };
+}
+
+function prepSourceInsights(profile) {
+  const terms = prepLessonTerms(profile);
   const termLabels = terms.map((term) =>
     `<span>${escapeHTML(term.english)}${term.meaning ? `・${escapeHTML(term.meaning)}` : ""}</span>`,
   ).join("");
@@ -1414,14 +1521,27 @@ function renderPrepCenter(user) {
     <section class="prep-plan-grid">
       <article class="card prep-plan-card goal"><span>01</span><h3>學習目標</h3><p>${profile.goal}</p><b>核心字詞</b><small>${profile.vocabulary}</small><b>核心句型</b><small>${profile.sentence}</small></article>
       <article class="card prep-plan-card flow"><span>02</span><h3>40 分鐘課程流程</h3><ol><li>暖身 5 分：${profile.warmup}</li><li>字詞輸入 10 分：圖像、發音、動作三路輸入。</li><li>句型操練 10 分：先全班、再同桌問答。</li><li>任務應用 12 分：${profile.task}</li><li>離堂檢核 3 分：一題聽力＋一題口說。</li></ol></article>
-      <article class="card prep-plan-card differentiation"><span>03</span><h3>差異化教學</h3><div><b>需要支持</b><p>提供圖像字卡、句首提示與二選一回答，先完成 4 個核心字詞。</p></div><div><b>符合程度</b><p>完成完整問答與資訊差任務，要求正確使用目標句型。</p></div><div><b>進階挑戰</b><p>移除句型支架，加入原因、數量或第三人稱描述。</p></div></article>
+      <article class="card prep-plan-card differentiation"><span>03</span><h3>差異化教學建議做法</h3>
+        <div><b>需要支持｜圖像與口語支架</b><p><strong>教師做法：</strong>先示範 4 個核心字詞，提供圖片、中文提示與句首。<br><strong>學生任務：</strong>完成看圖二選一，再跟讀並替換 1 個字詞。<br><strong>檢核：</strong>能指出圖片並說出單字，即完成基礎目標。</p></div>
+        <div><b>符合程度｜完整問答與合作</b><p><strong>教師做法：</strong>保留關鍵字提示，安排同桌資訊差活動。<br><strong>學生任務：</strong>使用「${escapeHTML(profile.sentence)}」完成 3 次完整問答。<br><strong>檢核：</strong>字詞正確且能以完整句回應。</p></div>
+        <div><b>進階挑戰｜延伸與自主表達</b><p><strong>教師做法：</strong>移除句型支架，加入原因、數量或第三人稱條件。<br><strong>學生任務：</strong>自行設計 2 題詢問同學，並用 2–3 句報告結果。<br><strong>檢核：</strong>能靈活替換字詞並補充新訊息。</p></div>
+      </article>
     </section>
     <div class="section-title"><div><h2>上課素材與教材資源包</h2><p>可直接搭配目前單元使用，再依班級狀況微調。</p></div></div>
     <section class="resource-pack-grid">
-      <article class="card resource-pack"><span>🖼️</span><h3>圖像字卡包</h3><p>核心字詞、圖片與中文提示，適合暖身和分組配對。</p><button class="secondary-btn prep-resource-action" data-resource="圖像字卡包">加入教材草稿</button></article>
-      <article class="card resource-pack"><span>🎧</span><h3>聽力任務包</h3><p>由字詞辨識到簡易對話，提供基礎與挑戰兩種速度。</p><button class="secondary-btn prep-resource-action" data-resource="聽力任務包">建立練習題</button></article>
-      <article class="card resource-pack"><span>🎭</span><h3>情境口說卡</h3><p>角色、任務與句型支架，可用於兩人練習及小組闖關。</p><button class="secondary-btn prep-resource-action" data-resource="情境口說卡">建立口說任務</button></article>
-      <article class="card resource-pack"><span>📝</span><h3>離堂檢核單</h3><p>用 3 分鐘確認學生是否掌握本節核心字詞與句型。</p><button class="secondary-btn prep-resource-action" data-resource="離堂檢核單">建立檢核題</button></article>
+      ${["flashcards", "listening", "differentiated", "checkup"].map((resourceKey) => {
+        const resource = prepResourceMaterial(resourceKey, profile);
+        const displayTitle = resource.title.split("｜").pop();
+        return `<article class="card resource-pack">
+          <span>${resource.icon}</span><h3>${displayTitle}</h3><p>${escapeHTML(resource.description.split("。").slice(-2).join("。"))}</p>
+          <ul>${resource.highlights.map((item) => `<li>${escapeHTML(item)}</li>`).join("")}</ul>
+          <small>已依 ${escapeHTML(selectedPrepUnit)} 產生 ${resource.questions.length} 題素材</small>
+          <div class="resource-pack-actions">
+            <button class="secondary-btn prep-resource-edit" data-resource-key="${resourceKey}">預覽與編輯</button>
+            <button class="primary-btn prep-resource-assign" data-resource-key="${resourceKey}">直接建立並派發</button>
+          </div>
+        </article>`;
+      }).join("")}
     </section>`;
 }
 
@@ -2019,8 +2139,9 @@ function renderAssignmentManager(user) {
     </section>`;
 }
 
-function renderAssignmentEditor(user, targetStudentId = "") {
+function renderAssignmentEditor(user, targetStudentId = "", preferredMaterialId = "") {
   const materials = teacherContent.materials.filter((item) => item.status === "published");
+  const initialMaterial = materials.find((item) => item.id === preferredMaterialId) || materials[0];
   const assignmentStudents = activeStudents();
   const assignmentClass = selectedTeacherClass();
   const initialMode = targetStudentId ? "individual" : "class";
@@ -2030,8 +2151,8 @@ function renderAssignmentEditor(user, targetStudentId = "") {
         <header><div><span class="mission-tag">任務指派器</span><h2>建立班級任務</h2></div><button class="ghost-btn close-assignment-editor" type="button">✕</button></header>
         <form id="assignment-form">
           <div class="form-grid">
-            <div class="field full"><label>選擇教材</label><select name="materialId" id="assignment-material" required>${materials.map((item) => `<option value="${item.id}">${escapeHTML(item.title)}（${item.cefrLevel}・${item.questions.length} 題）</option>`).join("")}</select></div>
-            <div class="field full"><label>任務名稱</label><input name="title" maxlength="120" value="${escapeHTML(materials[0]?.title || "")}" required /></div>
+            <div class="field full"><label>選擇教材</label><select name="materialId" id="assignment-material" required>${materials.map((item) => `<option value="${item.id}" ${item.id === initialMaterial?.id ? "selected" : ""}>${escapeHTML(item.title)}（${item.cefrLevel}・${item.questions.length} 題）</option>`).join("")}</select></div>
+            <div class="field full"><label>任務名稱</label><input name="title" maxlength="120" value="${escapeHTML(initialMaterial?.title || "")}" required /></div>
             <div class="field full">
               <label>派發方式</label>
               <div class="target-mode-switch">
@@ -2781,6 +2902,9 @@ function renderGameCard() {
     const completionCount = isAssignment ? 0 : getLocalDailyTaskCount(user, gameState.taskKey);
     const expectedXp = isWrongBook ? 5
       : isAssignment ? assignmentXp : calculateAwardedXp(baseXp, completionCount);
+    const score = Math.round((gameState.correct / gameState.questions.length) * 100);
+    const abilityGain = Math.min(5, Math.max(0, Math.round(score / 20)));
+    const abilityName = abilities.find((ability) => ability.id === gameState.ability)?.shortName;
     return `
       <article class="game-card result-card">
         <div class="result-burst">🏆</div>
@@ -2788,6 +2912,7 @@ function renderGameCard() {
         <h2>${gameState.title}過關！</h2>
         <p>你完成了 ${gameState.questions.length} 題練習，答對 <strong>${gameState.correct}</strong> 題。</p>
         <div class="result-xp">${isWrongBook ? "＋5 XP" : `＋${expectedXp} XP`}</div>
+        ${isWrongBook ? "" : `<p class="ability-gain-note">${escapeHTML(abilityName || "冒險能力")}＋${abilityGain}｜本次答對率 ${score}%</p>`}
         ${isWrongBook ? `<p class="repeat-xp-note">完成錯題精熟檢核，答對 ${gameState.correct}／${gameState.questions.length} 題。</p>` : ""}
         ${isAssignment ? '<p class="repeat-xp-note">教師任務依答對比例發放經驗值，答錯題不會獲得 XP。</p>' : ""}
         ${!isAssignment && !isWrongBook && completionCount >= 1 ? '<p class="repeat-xp-note">今日重複挑戰：本次經驗值折半</p>' : ""}
@@ -2868,6 +2993,7 @@ async function claimGameResult() {
   );
   const baseXp = isAssignment ? assignmentXp : 20 + gameState.correct * 5;
   const score = Math.round((gameState.correct / gameState.questions.length) * 100);
+  let abilityGain = Math.min(5, Math.max(0, Math.round(score / 20)));
 
   try {
     if (isWrongBook) {
@@ -2901,6 +3027,7 @@ async function claimGameResult() {
       );
       user.xp = updated.xp;
       awardedXp = updated.awardedXp;
+      abilityGain = updated.abilityGain ?? abilityGain;
       user.abilityValues = updated.abilityValues;
       user.abilityTrends = updated.abilityTrends;
       user.weeklySummary = updated.weeklySummary;
@@ -2915,6 +3042,7 @@ async function claimGameResult() {
       );
       user.xp = updated.xp;
       awardedXp = updated.awardedXp;
+      abilityGain = updated.abilityGain ?? abilityGain;
       user.abilityValues = updated.abilityValues;
       user.abilityTrends = updated.abilityTrends;
       user.weeklySummary = updated.weeklySummary;
@@ -2926,7 +3054,7 @@ async function claimGameResult() {
       user.abilityTrends ||= emptyAbilityValues();
       user.abilityValues[gameState.ability] = Math.min(
         100,
-        (user.abilityValues[gameState.ability] || 0) + 1,
+        (user.abilityValues[gameState.ability] || 0) + abilityGain,
       );
       user.abilityTrends[gameState.ability] =
         (user.abilityTrends[gameState.ability] || 0) + 1;
@@ -2943,7 +3071,8 @@ async function claimGameResult() {
     document.getElementById("game-modal")?.remove();
     render();
     window.scrollTo({ top: 0, behavior: "smooth" });
-    toast(`訓練完成！獲得 ${awardedXp} XP${!isAssignment && awardedXp < baseXp ? "（今日重複挑戰折半）" : ""}`);
+    const ability = abilities.find((item) => item.id === gameState.ability);
+    toast(`訓練完成！獲得 ${awardedXp} XP，${ability?.shortName || "能力值"}＋${abilityGain}${!isAssignment && awardedXp < baseXp ? "（今日重複挑戰折半）" : ""}`);
   } catch {
     gameState.synced = false;
     if (claimButton) {
@@ -3547,44 +3676,43 @@ function bindEvents() {
     }
   });
 
-  document.querySelectorAll(".prep-resource-action").forEach((button) => {
+  document.querySelectorAll(".prep-resource-edit").forEach((button) => {
     button.addEventListener("click", () => {
-      const profile = prepUnitProfile(selectedPrepVersion, selectedPrepUnit);
-      const uploadedWords = teachingTermsFromText(prepSourceText)
-        .map((term) => term.english)
-        .filter(Boolean);
-      const profileWords = profile.vocabulary
-        .split(",")
-        .map((word) => word.trim())
-        .filter((word) => /^[A-Za-z][A-Za-z '-]+$/.test(word));
-      const words = [...new Set([...uploadedWords, ...profileWords])].slice(0, 10);
-      const fallbackOptions = ["hello", "friend", "school", "teacher"];
-      const questions = words.slice(0, 6).map((word, index) => ({
-        visual: ["🖼️", "🎧", "🎭", "📝"][index % 4],
-        prompt: `選出本單元核心字詞「${word}」。`,
-        options: [...new Set([
-          word,
-          ...words.filter((item) => item !== word),
-          ...fallbackOptions.filter((item) => item !== word),
-        ])].slice(0, 4),
-        answer: 0,
-        speech: button.dataset.resource.includes("聽力") ? word : "",
-      }));
-      questions.forEach((question) => {
-        const answer = question.options[0];
-        question.options = seededShuffle(question.options, `${answer}:prep`);
-        question.answer = question.options.indexOf(answer);
-      });
-      document.body.insertAdjacentHTML("beforeend", renderMaterialEditor({
-        title: `${selectedPrepVersion} ${selectedPrepUnit}｜${button.dataset.resource}`,
-        description: profile.goal,
-        ability: button.dataset.resource.includes("聽力") ? "echo"
-          : button.dataset.resource.includes("口說") ? "voice" : "word",
-        cefrLevel: "Pre-A1",
-        status: "draft",
-        questions,
-      }));
+      const material = prepResourceMaterial(
+        button.dataset.resourceKey,
+        prepUnitProfile(selectedPrepVersion, selectedPrepUnit),
+      );
+      document.body.insertAdjacentHTML("beforeend", renderMaterialEditor(material));
       bindMaterialEditorEvents();
+    });
+  });
+
+  document.querySelectorAll(".prep-resource-assign").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const originalText = button.textContent;
+      button.disabled = true;
+      button.textContent = "正在建立...";
+      try {
+        const material = prepResourceMaterial(
+          button.dataset.resourceKey,
+          prepUnitProfile(selectedPrepVersion, selectedPrepUnit),
+        );
+        const savedMaterial = await Cloud.saveMaterial({
+          ...material,
+          status: "published",
+        });
+        await refreshTeacherStudents(currentUser());
+        document.body.insertAdjacentHTML(
+          "beforeend",
+          renderAssignmentEditor(currentUser(), "", savedMaterial.id),
+        );
+        bindAssignmentEditorEvents();
+        toast("課程資源已建立，請選擇派發對象與獎勵。");
+      } catch (error) {
+        button.disabled = false;
+        button.textContent = originalText;
+        toast(`資源建立失敗：${error.message}`);
+      }
     });
   });
 
