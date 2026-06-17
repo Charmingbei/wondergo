@@ -2056,12 +2056,87 @@ button {
   margin-bottom: -35px;
 }
 
+.prep-owned-panel,
+.ai-prep-panel {
+  margin: 20px 0;
+  padding: 22px;
+}
+
+.prep-owned-panel {
+  border: 2px solid #d8f1eb;
+  background: linear-gradient(135deg, #f4fffb, #f6f3ff);
+}
+
+.ai-prep-panel {
+  border: 2px solid #e4ddff;
+  background: linear-gradient(135deg, #fff, #f7f4ff);
+}
+
+.prep-panel-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.prep-panel-heading h2 {
+  margin: 4px 0 6px;
+  font-size: 25px;
+}
+
+.prep-panel-heading p {
+  max-width: 760px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.owned-material-result {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr auto;
+  gap: 16px;
+  margin-top: 18px;
+  padding: 18px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.owned-material-result:not(.ready) {
+  grid-template-columns: 0.9fr 1.5fr;
+}
+
+.owned-material-result b {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.owned-material-result p,
+.owned-material-result li {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.owned-material-result ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.owned-material-actions {
+  display: grid;
+  align-content: center;
+  gap: 9px;
+  min-width: 170px;
+}
+
 .prep-controls {
   display: grid;
   grid-template-columns: 0.7fr 1fr 1.3fr;
   gap: 15px;
-  margin: 20px 0;
-  padding: 18px;
+  margin: 18px 0 0;
+  padding: 0;
 }
 
 .prep-controls .field {
@@ -4374,8 +4449,19 @@ td {
 
   .prep-controls,
   .prep-plan-grid,
-  .prep-insight-grid {
+  .prep-insight-grid,
+  .owned-material-result {
     grid-template-columns: 1fr;
+  }
+
+  .prep-panel-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .prep-panel-heading .primary-btn,
+  .owned-material-actions button {
+    width: 100%;
   }
 
   .resource-pack-grid,
@@ -4561,6 +4647,15 @@ td {
   .prep-hero img {
     width: 100px;
     opacity: 0.72;
+  }
+
+  .prep-owned-panel,
+  .ai-prep-panel {
+    padding: 18px;
+  }
+
+  .owned-material-actions {
+    min-width: 0;
   }
 
   .theme-badge-grid {

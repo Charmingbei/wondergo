@@ -1514,8 +1514,8 @@ function prepUnits(version = selectedPrepVersion, book = selectedPrepBook) {
   return textbookCatalog[version]?.[book] || [];
 }
 
-function prepLessonTerms(profile) {
-  const uploadedTerms = teachingTermsFromText(prepSourceText).slice(0, 10);
+function prepLessonTerms(profile, useUploadedSource = false) {
+  const uploadedTerms = useUploadedSource ? teachingTermsFromText(prepSourceText).slice(0, 10) : [];
   if (uploadedTerms.length) return uploadedTerms;
   return profile.vocabulary
     .split(",")
@@ -1557,8 +1557,8 @@ function prepQuestionOptions(answer, lessonWords, fallbackWords) {
   ])].slice(0, 4);
 }
 
-function prepResourceMaterial(resourceKey, profile) {
-  const terms = prepLessonTerms(profile);
+function prepResourceMaterial(resourceKey, profile, useUploadedSource = false) {
+  const terms = prepLessonTerms(profile, useUploadedSource);
   const lessonWords = terms.map((term) => term.english).filter(Boolean);
   const fallbackWords = ["hello", "friend", "school", "teacher", "book", "apple"];
   const usableWords = [...new Set([...lessonWords, ...fallbackWords])].slice(0, 10);
@@ -1646,9 +1646,9 @@ function prepResourceMaterial(resourceKey, profile) {
   };
 }
 
-function prepResourceFiles(resourceKey, profile) {
-  const material = prepResourceMaterial(resourceKey, profile);
-  const words = prepLessonTerms(profile).map((term) => term.english).filter(Boolean);
+function prepResourceFiles(resourceKey, profile, useUploadedSource = false) {
+  const material = prepResourceMaterial(resourceKey, profile, useUploadedSource);
+  const words = prepLessonTerms(profile, useUploadedSource).map((term) => term.english).filter(Boolean);
   const baseContent = {
     goal: profile.goal,
     vocabulary: words,
@@ -1775,25 +1775,56 @@ function renderResourceContent(content = {}) {
     ${content.questions?.length ? `<div class="resource-detail-row"><b>內含題目</b><ol>${content.questions.slice(0, 10).map((question) => `<li>${escapeHTML(question.prompt)}</li>`).join("")}</ol></div>` : ""}`;
 }
 
-function prepSourceInsights(profile) {
-  const terms = prepLessonTerms(profile);
+function prepSourceInsights(profile, useUploadedSource = false) {
+  const hasUploadedSource = useUploadedSource && Boolean(prepSourceText);
+  const terms = prepLessonTerms(profile, useUploadedSource);
   const termLabels = terms.map((term) =>
     `<span>${escapeHTML(term.english)}${term.meaning ? `・${escapeHTML(term.meaning)}` : ""}</span>`,
   ).join("");
   return `
     <section class="card prep-insight">
       <div class="prep-insight-heading">
-        <div><span class="quest-eyebrow">SMART CO-PLANNING</span><h2>${prepSourceText ? "教材共備摘要" : "單元備課重點"}</h2></div>
-        <span class="status ${prepSourceText ? "success" : ""}">${prepSourceText ? "已讀取教師教材" : "版本單元建議"}</span>
+        <div><span class="quest-eyebrow">SMART CO-PLANNING</span><h2>${hasUploadedSource ? "教材共備摘要" : "單元備課重點"}</h2></div>
+        <span class="status ${hasUploadedSource ? "success" : ""}">${hasUploadedSource ? "已讀取教師教材" : "版本單元建議"}</span>
       </div>
       <div class="prep-insight-grid">
         <div><b>本課核心語料</b><div class="prep-term-list">${termLabels || "<span>上傳教材後自動整理</span>"}</div></div>
-        <div><b>教學調整建議</b><p>${prepSourceText
+        <div><b>教學調整建議</b><p>${hasUploadedSource
           ? "先用教材中的原句做理解輸入，再將核心字詞放入圖片辨識、聽力選擇與口說任務；離堂前以不同題型再次檢核。"
           : "先確認學生能辨識核心字詞，再進入完整句型；同一語料至少安排一次理解任務與一次表達任務。"}</p></div>
-        <div><b>共備提醒</b><p>${prepSourceText
+        <div><b>共備提醒</b><p>${hasUploadedSource
           ? `已讀取 ${prepSourceText.length.toLocaleString()} 字。建議從上方語料挑選 6–10 個核心字詞，避免單節課負荷過高。`
-          : "可上傳講義、簡報、PDF、Word、試算表或圖片，系統會擷取內容並更新共備建議。"}</p></div>
+          : "此區依目前選擇的教科書版本、冊數與單元產生，可作為 AI 備課包的課程核心。"}</p></div>
+      </div>
+    </section>`;
+}
+
+function renderTeacherOwnedMaterialPanel(profile) {
+  const uploadedTerms = teachingTermsFromText(prepSourceText).slice(0, 10);
+  const termLabels = uploadedTerms.map((term) =>
+    `<span>${escapeHTML(term.english)}${term.meaning ? `・${escapeHTML(term.meaning)}` : ""}</span>`,
+  ).join("");
+  return `
+    <section class="card prep-owned-panel">
+      <div class="prep-panel-heading">
+        <div><span class="quest-eyebrow">TEACHER MATERIALS</span><h2>教師自有教材</h2><p>上傳老師自己的講義、簡報、PDF、試算表、圖片或文字教材後，系統會擷取核心語料並產生題目草稿。</p></div>
+        <label class="primary-btn teaching-file-button">上傳教材並分析<input id="prep-material-file" type="file" /></label>
+      </div>
+      <div class="owned-material-result ${prepSourceText ? "ready" : ""}">
+        ${prepSourceText ? `
+          <div><b>已讀取教材</b><p id="prep-file-status">已分析 ${prepSourceText.length.toLocaleString()} 字，可用於出題。</p></div>
+          <div><b>擷取語料</b><div class="prep-term-list">${termLabels || "<span>尚未擷取到英文單字，仍可手動命題。</span>"}</div></div>
+          <div class="owned-material-actions">
+            <button class="secondary-btn clear-owned-material" type="button">清除重傳</button>
+            <button class="primary-btn generate-owned-material-quiz" type="button">用自有教材產生題組</button>
+          </div>
+        ` : `
+          <div><b>尚未上傳教材</b><p id="prep-file-status">請先選擇檔案。檔案只在瀏覽器中解析，產生題目後仍可逐題修改。</p></div>
+          <ul>
+            <li>適合：教師授課簡報、單元講義、單字表、閱讀文本、學習單。</li>
+            <li>用途：自動整理核心字詞，產生選擇、聽力、閱讀或拼字題草稿。</li>
+          </ul>
+        `}
       </div>
     </section>`;
 }
@@ -1804,22 +1835,24 @@ function renderPrepCenter(user) {
   const units = prepUnits(selectedPrepVersion, selectedPrepBook);
   if (!units.includes(selectedPrepUnit)) selectedPrepUnit = units[0];
   const profile = prepUnitProfile(selectedPrepVersion, selectedPrepUnit);
-  const sourceNote = prepSourceText
-    ? `已分析教師教材 ${prepSourceText.length.toLocaleString()} 字，建議將教材中的核心字詞套入以下流程。`
-    : "尚未上傳自有教材；目前依版本、冊數與單元提供基礎規劃。";
   return `
-    ${teacherHeader(user, "備課中心", "選擇教科書版本、冊數與單元，取得課程規劃、素材包與差異化教學建議")}
+    ${teacherHeader(user, "備課中心", "上傳自有教材命題，或使用 AI 備課包快速產出課程規劃")}
     <section class="prep-hero">
-      <div><span class="quest-eyebrow">LESSON LAB</span><h2>和 Toki 一起把課備得更完整</h2><p>先選課本版本、冊數與單元，也能上傳自己的講義、簡報或學習單進行智慧共備。</p></div>
+      <div><span class="quest-eyebrow">LESSON LAB</span><h2>把備課分成兩條清楚路線</h2><p>教師自有教材用來上傳命題；AI 備課包依教科書版本、冊數與單元產出學習目標、教學流程、重點與素材包。</p></div>
       <img src="assets/toki.png" alt="Toki 備課夥伴" />
     </section>
-    <section class="card prep-controls">
-      <div class="field"><label>教科書版本</label><select id="prep-version">${Object.keys(textbookCatalog).map((version) => `<option ${version === selectedPrepVersion ? "selected" : ""}>${version}</option>`).join("")}</select></div>
-      <div class="field"><label>冊數</label><select id="prep-book">${books.map((book) => `<option ${book === selectedPrepBook ? "selected" : ""}>${book}</option>`).join("")}</select></div>
-      <div class="field"><label>單元</label><select id="prep-unit">${units.map((unit) => `<option ${unit === selectedPrepUnit ? "selected" : ""}>${unit}</option>`).join("")}</select></div>
-      <div class="field prep-upload-field"><label>教師自有教材</label><label class="secondary-btn teaching-file-button">上傳教材共備<input id="prep-material-file" type="file" /></label><small id="prep-file-status">${sourceNote}</small></div>
+    ${renderTeacherOwnedMaterialPanel(profile)}
+    <section class="card ai-prep-panel">
+      <div class="prep-panel-heading">
+        <div><span class="quest-eyebrow">AI LESSON PACK</span><h2>AI 備課包</h2><p>選擇教科書版本、冊數與單元後，自動產出對應的學習目標、教學流程與重點，以及上課素材與教材資源包。</p></div>
+      </div>
+      <div class="prep-controls">
+        <div class="field"><label>教科書版本</label><select id="prep-version">${Object.keys(textbookCatalog).map((version) => `<option ${version === selectedPrepVersion ? "selected" : ""}>${version}</option>`).join("")}</select></div>
+        <div class="field"><label>冊數</label><select id="prep-book">${books.map((book) => `<option ${book === selectedPrepBook ? "selected" : ""}>${book}</option>`).join("")}</select></div>
+        <div class="field"><label>單元</label><select id="prep-unit">${units.map((unit) => `<option ${unit === selectedPrepUnit ? "selected" : ""}>${unit}</option>`).join("")}</select></div>
+      </div>
     </section>
-    ${prepSourceInsights(profile)}
+    ${prepSourceInsights(profile, false)}
     <section class="prep-plan-grid">
       <article class="card prep-plan-card goal"><span>01</span><h3>學習目標</h3><p>${profile.goal}</p><b>核心字詞</b><small>${profile.vocabulary}</small><b>核心句型</b><small>${profile.sentence}</small></article>
       <article class="card prep-plan-card flow"><span>02</span><h3>40 分鐘課程流程</h3><ol><li>暖身 5 分：${profile.warmup}</li><li>字詞輸入 10 分：圖像、發音、動作三路輸入。</li><li>句型操練 10 分：先全班、再同桌問答。</li><li>任務應用 12 分：${profile.task}</li><li>離堂檢核 3 分：一題聽力＋一題口說。</li></ol></article>
@@ -1846,6 +1879,21 @@ function renderPrepCenter(user) {
         </article>`;
       }).join("")}
     </section>`;
+}
+
+function ownedMaterialDraftFromUpload() {
+  const profile = prepUnitProfile(selectedPrepVersion, selectedPrepUnit);
+  const material = prepResourceMaterial("checkup", profile, true);
+  return {
+    title: `自有教材題組｜${new Date().toLocaleDateString("zh-TW")}`,
+    description: prepSourceText
+      ? `依教師上傳教材擷取核心語料產生，來源約 ${prepSourceText.length.toLocaleString()} 字。`
+      : "依教師自有教材建立的題組草稿。",
+    ability: "word",
+    cefrLevel: "Pre-A1",
+    status: "draft",
+    questions: material.questions,
+  };
 }
 
 function renderStudentPreview(user) {
@@ -4170,11 +4218,24 @@ function bindEvents() {
         if (status) status.textContent = `${message}｜${file.name}`;
       })).trim();
       render();
-      toast(`已讀取 ${file.name}，共備建議已更新。`);
+      toast(`已讀取 ${file.name}，可用自有教材產生題組。`);
     } catch (error) {
       if (status) status.textContent = "教材讀取失敗";
       toast(error.message);
     }
+  });
+
+  document.querySelector(".clear-owned-material")?.addEventListener("click", () => {
+    prepSourceText = "";
+    render();
+    toast("已清除自有教材，可重新上傳。");
+  });
+
+  document.querySelector(".generate-owned-material-quiz")?.addEventListener("click", () => {
+    const draft = ownedMaterialDraftFromUpload();
+    document.body.insertAdjacentHTML("beforeend", renderMaterialEditor(draft));
+    bindMaterialEditorEvents();
+    toast("已依自有教材產生題組草稿，可逐題修改後發布。");
   });
 
   document.querySelectorAll(".prep-resource-preview").forEach((button) => {
