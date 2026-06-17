@@ -51,11 +51,24 @@ const curriculumCompetencies = [
   },
 ];
 
+const textbookBookUnits = {
+  "第 1 冊": ["Starter Unit 字母與問候", "Unit 1 自我介紹", "Unit 2 教室物品", "Unit 3 顏色與數字", "Review 1", "Unit 4 動物", "Unit 5 家人", "Review 2", "Culture / Festival 文化節慶"],
+  "第 2 冊": ["Starter Unit 複習與暖身", "Unit 1 學用品與位置", "Unit 2 食物與喜好", "Unit 3 身體部位", "Review 1", "Unit 4 能力與動作", "Unit 5 服裝與顏色", "Review 2", "Culture / Festival 文化節慶"],
+  "第 3 冊": ["Starter Unit 日常問候", "Unit 1 人物與朋友", "Unit 2 年齡與數字", "Unit 3 家人與職業", "Review 1", "Unit 4 房間與居家", "Unit 5 天氣", "Review 2", "Culture / Festival 文化節慶"],
+  "第 4 冊": ["Starter Unit 句型複習", "Unit 1 時間與作息", "Unit 2 星期與活動", "Unit 3 地點與方向", "Review 1", "Unit 4 食物與點餐", "Unit 5 動物與特徵", "Review 2", "Culture / Festival 文化節慶"],
+  "第 5 冊": ["Starter Unit 基礎句型整合", "Unit 1 個性與外貌", "Unit 2 校園生活", "Unit 3 休閒活動", "Review 1", "Unit 4 交通工具", "Unit 5 社區場所", "Review 2", "Culture / Festival 文化節慶"],
+  "第 6 冊": ["Starter Unit 生活英語暖身", "Unit 1 國家與城市", "Unit 2 日期與節日", "Unit 3 健康與感受", "Review 1", "Unit 4 購物與價格", "Unit 5 旅行與計畫", "Review 2", "Culture / Festival 文化節慶"],
+  "第 7 冊": ["Starter Unit 國中銜接複習", "Unit 1 自我與校園", "Unit 2 家庭與日常", "Unit 3 食物與健康", "Review 1", "Unit 4 地點與交通", "Unit 5 興趣與活動", "Review 2", "Reading Challenge 閱讀挑戰"],
+  "第 8 冊": ["Starter Unit 進階句型暖身", "Unit 1 過去經驗", "Unit 2 未來計畫", "Unit 3 比較與描述", "Review 1", "Unit 4 文化與節慶", "Unit 5 專題任務", "Review 2", "Graduation Project 畢業任務"],
+};
+
 const textbookCatalog = {
-  康軒: ["Starter Unit", "Unit 1 人物與自我介紹", "Unit 2 年齡與數字", "Unit 3 家人與職業", "Review 1"],
-  翰林: ["Get Ready", "Unit 1 日常問候", "Unit 2 教室物品", "Unit 3 能力與活動", "Review 1"],
-  何嘉仁: ["Starter", "Unit 1 我的朋友", "Unit 2 食物與喜好", "Unit 3 時間與作息", "Review"],
-  自編教材: ["主題式單字", "生活情境對話", "閱讀與故事", "跨領域任務"],
+  康軒: textbookBookUnits,
+  翰林: textbookBookUnits,
+  何嘉仁: textbookBookUnits,
+  自編教材: {
+    "主題課程": ["主題式單字", "生活情境對話", "閱讀與故事", "跨領域任務", "專題發表"],
+  },
 };
 
 const levelMilestones = [
@@ -348,7 +361,8 @@ let adminAccountFilter = "all";
 let gameState = null;
 let selectedWorldCountry = null;
 let selectedPrepVersion = "康軒";
-let selectedPrepUnit = textbookCatalog["康軒"][0];
+let selectedPrepBook = Object.keys(textbookCatalog["康軒"])[0];
+let selectedPrepUnit = textbookCatalog["康軒"][selectedPrepBook][0];
 let prepSourceText = "";
 let selectedPreviewStudent = 0;
 let selectedCoursePackId = "";
@@ -1342,9 +1356,10 @@ function renderCoursePackEditor(pack = null) {
       <form id="course-pack-form">
         <input type="hidden" name="id" value="${pack?.id || ""}" />
         <div class="form-grid">
-          <div class="field full"><label>資料夾名稱</label><input name="title" value="${escapeHTML(pack?.title || `${selectedPrepVersion} ${selectedPrepUnit}`)}" required /></div>
+          <div class="field full"><label>資料夾名稱</label><input name="title" value="${escapeHTML(pack?.title || `${selectedPrepVersion} ${selectedPrepBook} ${selectedPrepUnit}`)}" required /></div>
           <div class="field"><label>教科書版本</label><input name="textbookVersion" value="${escapeHTML(pack?.textbookVersion || selectedPrepVersion)}" /></div>
-          <div class="field"><label>單元</label><input name="unitName" value="${escapeHTML(pack?.unitName || selectedPrepUnit)}" /></div>
+          <div class="field"><label>冊數</label><input name="bookName" value="${escapeHTML(selectedPrepBook)}" disabled /></div>
+          <div class="field"><label>單元</label><input name="unitName" value="${escapeHTML(pack?.unitName || `${selectedPrepBook}｜${selectedPrepUnit}`)}" /></div>
           <div class="field full"><label>課程名稱</label><input name="courseName" value="${escapeHTML(pack?.courseName || selectedPrepUnit)}" placeholder="例：Unit 1 自我介紹課程包" required /></div>
           <div class="field full"><label>課程說明</label><textarea name="description" rows="3" placeholder="本課的學習目標與使用方式">${escapeHTML(pack?.description || "")}</textarea></div>
         </div>
@@ -1491,6 +1506,14 @@ function prepUnitProfile(version, unit) {
   return profiles[theme];
 }
 
+function prepBooks(version = selectedPrepVersion) {
+  return Object.keys(textbookCatalog[version] || {});
+}
+
+function prepUnits(version = selectedPrepVersion, book = selectedPrepBook) {
+  return textbookCatalog[version]?.[book] || [];
+}
+
 function prepLessonTerms(profile) {
   const uploadedTerms = teachingTermsFromText(prepSourceText).slice(0, 10);
   if (uploadedTerms.length) return uploadedTerms;
@@ -1616,7 +1639,7 @@ function prepResourceMaterial(resourceKey, profile) {
   const resource = resources[resourceKey] || resources.checkup;
   return {
     ...resource,
-    title: `${selectedPrepVersion} ${selectedPrepUnit}｜${resource.title}`,
+    title: `${selectedPrepVersion} ${selectedPrepBook} ${selectedPrepUnit}｜${resource.title}`,
     description: `${profile.goal} ${resource.description}`,
     cefrLevel: "Pre-A1",
     status: "draft",
@@ -1776,20 +1799,23 @@ function prepSourceInsights(profile) {
 }
 
 function renderPrepCenter(user) {
-  const units = textbookCatalog[selectedPrepVersion] || [];
+  const books = prepBooks(selectedPrepVersion);
+  if (!books.includes(selectedPrepBook)) selectedPrepBook = books[0];
+  const units = prepUnits(selectedPrepVersion, selectedPrepBook);
   if (!units.includes(selectedPrepUnit)) selectedPrepUnit = units[0];
   const profile = prepUnitProfile(selectedPrepVersion, selectedPrepUnit);
   const sourceNote = prepSourceText
     ? `已分析教師教材 ${prepSourceText.length.toLocaleString()} 字，建議將教材中的核心字詞套入以下流程。`
-    : "尚未上傳自有教材；目前依版本與單元提供基礎規劃。";
+    : "尚未上傳自有教材；目前依版本、冊數與單元提供基礎規劃。";
   return `
-    ${teacherHeader(user, "備課中心", "選擇教科書版本與單元，取得課程規劃、素材包與差異化教學建議")}
+    ${teacherHeader(user, "備課中心", "選擇教科書版本、冊數與單元，取得課程規劃、素材包與差異化教學建議")}
     <section class="prep-hero">
-      <div><span class="quest-eyebrow">LESSON LAB</span><h2>和 Toki 一起把課備得更完整</h2><p>先選課本版本與單元，也能上傳自己的講義、簡報或學習單進行智慧共備。</p></div>
+      <div><span class="quest-eyebrow">LESSON LAB</span><h2>和 Toki 一起把課備得更完整</h2><p>先選課本版本、冊數與單元，也能上傳自己的講義、簡報或學習單進行智慧共備。</p></div>
       <img src="assets/toki.png" alt="Toki 備課夥伴" />
     </section>
     <section class="card prep-controls">
       <div class="field"><label>教科書版本</label><select id="prep-version">${Object.keys(textbookCatalog).map((version) => `<option ${version === selectedPrepVersion ? "selected" : ""}>${version}</option>`).join("")}</select></div>
+      <div class="field"><label>冊數</label><select id="prep-book">${books.map((book) => `<option ${book === selectedPrepBook ? "selected" : ""}>${book}</option>`).join("")}</select></div>
       <div class="field"><label>單元</label><select id="prep-unit">${units.map((unit) => `<option ${unit === selectedPrepUnit ? "selected" : ""}>${unit}</option>`).join("")}</select></div>
       <div class="field prep-upload-field"><label>教師自有教材</label><label class="secondary-btn teaching-file-button">上傳教材共備<input id="prep-material-file" type="file" /></label><small id="prep-file-status">${sourceNote}</small></div>
     </section>
@@ -4113,7 +4139,14 @@ function bindEvents() {
 
   document.getElementById("prep-version")?.addEventListener("change", (event) => {
     selectedPrepVersion = event.target.value;
-    selectedPrepUnit = textbookCatalog[selectedPrepVersion][0];
+    selectedPrepBook = prepBooks(selectedPrepVersion)[0];
+    selectedPrepUnit = prepUnits(selectedPrepVersion, selectedPrepBook)[0];
+    render();
+  });
+
+  document.getElementById("prep-book")?.addEventListener("change", (event) => {
+    selectedPrepBook = event.target.value;
+    selectedPrepUnit = prepUnits(selectedPrepVersion, selectedPrepBook)[0];
     render();
   });
 

@@ -1,4 +1,4 @@
-const Cloud = (() => {
+var Cloud = (() => {
   const SESSION_KEY = "wondergo-cloud-session";
   let sessionRefreshPromise = null;
 
