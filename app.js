@@ -1453,52 +1453,295 @@ function renderSavedResourcePreview(resource) {
 
 function prepUnitProfile(version, unit) {
   const joined = `${version} ${unit}`;
-  const theme = joined.includes("食物") ? "food"
-    : joined.includes("家人") || joined.includes("職業") ? "family"
-      : joined.includes("教室") ? "school"
-        : joined.includes("時間") ? "time"
-          : joined.includes("朋友") || joined.includes("人物") || joined.includes("問候") ? "intro"
-            : "daily";
+  const has = (...patterns) => patterns.some((pattern) => joined.includes(pattern));
+  const theme = has("Review", "複習") ? "review"
+    : has("Culture", "文化", "節慶", "Festival", "日期與節日") ? "festival"
+      : has("Reading", "閱讀") ? "reading"
+        : has("專題", "畢業") ? "project"
+          : has("過去經驗") ? "past"
+            : has("未來計畫", "旅行與計畫") ? "future"
+              : has("比較", "描述") ? "compare"
+                : has("購物", "價格") ? "shopping"
+                  : has("健康", "感受") ? "feelings"
+                    : has("國家", "城市") ? "countries"
+                      : has("交通") ? "transport"
+                        : has("社區", "地點", "方向") ? "places"
+                          : has("休閒", "興趣", "星期與活動") ? "activities"
+                            : has("校園生活") ? "schoolLife"
+                              : has("個性", "外貌") ? "appearance"
+                                : has("天氣") ? "weather"
+                                  : has("房間", "居家") ? "home"
+                                    : has("服裝") ? "clothes"
+                                      : has("能力", "動作") ? "actions"
+                                        : has("身體") ? "body"
+                                          : has("食物", "點餐") ? "food"
+                                            : has("家人", "職業") ? "family"
+                                              : has("動物") ? "animals"
+                                                : has("顏色", "數字", "年齡") ? "colorsNumbers"
+                                                  : has("教室", "學用品") ? "school"
+                                                    : has("時間", "作息") ? "time"
+                                                      : has("字母") ? "alphabet"
+                                                        : has("朋友", "人物", "問候", "自我", "介紹", "Starter") ? "intro"
+                                                        : "daily";
   const profiles = {
+    alphabet: {
+      topic: "字母與問候",
+      goal: "能辨識英文字母與基礎問候語，建立開口說英語的課堂例行。",
+      vocabulary: "A, B, C, hello, hi, goodbye",
+      sentence: "Hello! / Goodbye!",
+      focus: "以字母音名、招呼語與課堂回應建立英語學習安全感。",
+      warmup: "用字母卡與招呼手勢進行快速配對，讓學生邊看邊說。",
+      task: "學生抽字母卡向同學問候，完成三次交換與回應。",
+    },
     food: {
+      topic: "食物與喜好",
       goal: "能辨識常見食物字詞，使用 I like... / Do you like...? 表達喜好。",
       vocabulary: "apple, banana, rice, bread, milk, juice",
       sentence: "I like ___. / Do you like ___? Yes, I do.",
+      focus: "從食物字詞進入喜好表達，練習問答中的肯定與否定回應。",
       warmup: "用食物圖片進行 30 秒快速命名，再讓學生選出自己喜歡的食物。",
       task: "兩人一組完成餐點喜好調查，最後用英語報告一位同學的答案。",
     },
     family: {
+      topic: "家人與職業",
       goal: "能介紹家人與職業，使用 This is my... / He or She is a...。",
       vocabulary: "mother, father, sister, brother, teacher, doctor",
       sentence: "This is my ___. / He is a ___.",
+      focus: "連結人物關係與職業稱謂，建立 he/she 與 my 的基礎使用。",
       warmup: "出示角色卡，請學生猜人物關係並說出已知單字。",
       task: "製作迷你家庭角色卡，以兩句英語完成介紹。",
     },
     school: {
+      topic: "教室與學用品",
       goal: "能辨識教室物品並使用 What's this? / It's a... 進行問答。",
       vocabulary: "book, pencil, ruler, desk, chair, schoolbag",
       sentence: "What's this? / It's a ___.",
+      focus: "聚焦物品辨識、單複數初步概念與 this/it 的問答替換。",
       warmup: "教室尋寶：教師說單字，學生快速指出對應物品。",
       task: "小組輪流抽物品卡，以完整問答句完成配對。",
     },
     time: {
+      topic: "時間與作息",
       goal: "能聽懂並表達整點時間與簡易日常作息。",
       vocabulary: "morning, afternoon, evening, o'clock",
       sentence: "What time is it? / It's ___ o'clock.",
+      focus: "將數字與作息情境結合，讓學生能聽懂並回答時間。",
       warmup: "用時鐘圖片快速複習數字，猜測 Toki 的作息時間。",
       task: "完成一日作息時間軸，和同伴進行時間問答。",
     },
     intro: {
+      topic: "問候與自我介紹",
       goal: "能使用問候語、自我介紹並詢問姓名或基本資料。",
       vocabulary: "hello, name, friend, student, teacher",
       sentence: "What's your name? / My name is ___.",
+      focus: "建立初次見面情境，練習姓名問答與自然回應。",
       warmup: "播放角色見面情境，學生找出聽到的問候語。",
       task: "進行角色交換卡活動，和三位同學完成英語自我介紹。",
     },
+    colorsNumbers: {
+      topic: "顏色、數字與年齡",
+      goal: "能辨識顏色與數字，並用 I am... / It is... 描述年齡、數量或顏色。",
+      vocabulary: "red, blue, yellow, green, one, ten",
+      sentence: "How old are you? / I am ___.",
+      focus: "結合顏色與數字，練習形容詞放在名詞前與年齡問答。",
+      warmup: "用彩色數字卡進行快問快答，學生說出顏色與數字。",
+      task: "完成顏色與年齡訪問表，向同學提問並記錄答案。",
+    },
+    animals: {
+      topic: "動物與特徵",
+      goal: "能說出常見動物名稱，並用 It is... / I see... 描述動物特徵。",
+      vocabulary: "dog, cat, bird, fish, rabbit, elephant",
+      sentence: "What do you see? / I see a ___.",
+      focus: "從動物字詞延伸到大小、顏色與簡短描述。",
+      warmup: "播放動物聲音或展示局部圖片，學生猜出動物名稱。",
+      task: "完成動物觀察卡，向同伴介紹一種動物。",
+    },
+    body: {
+      topic: "身體部位",
+      goal: "能辨識身體部位，並依指令做出 touch / show 等課堂反應。",
+      vocabulary: "head, eyes, ears, nose, mouth, hands",
+      sentence: "Touch your ___. / This is my ___.",
+      focus: "以 TPR 全身反應法建立聽力理解與身體部位詞彙。",
+      warmup: "進行 Simon Says，學生聽指令觸碰對應部位。",
+      task: "小組設計三個身體部位指令並帶領同學完成。",
+    },
+    actions: {
+      topic: "能力與動作",
+      goal: "能辨識常見動作，並用 can / can't 表達自己會做的事。",
+      vocabulary: "run, jump, swim, sing, dance, draw",
+      sentence: "Can you ___? / Yes, I can.",
+      focus: "建立 can 問答與動作動詞，鼓勵學生以動作輔助口說。",
+      warmup: "教師做動作，學生猜動詞並跟著做。",
+      task: "完成能力賓果，訪問同學會做哪些動作。",
+    },
+    clothes: {
+      topic: "服裝與顏色",
+      goal: "能說出服裝字詞，並用顏色描述穿著。",
+      vocabulary: "shirt, T-shirt, skirt, pants, shoes, jacket",
+      sentence: "What are you wearing? / I am wearing ___.",
+      focus: "整合服裝與顏色形容，練習 wearing 的生活化表達。",
+      warmup: "用服裝圖片和顏色卡配對，快速說出 blue shirt 等詞組。",
+      task: "設計 Toki 的冒險穿搭，並用兩句英語介紹。",
+    },
+    home: {
+      topic: "房間與居家",
+      goal: "能辨識家中空間與物品，使用 Where is...? / It is in... 描述位置。",
+      vocabulary: "bedroom, kitchen, bathroom, living room, door, window",
+      sentence: "Where is the ___? / It is in the ___.",
+      focus: "連結空間字詞與位置問答，建立 in/on/under 的初步理解。",
+      warmup: "看房屋平面圖找物品，學生說出所在房間。",
+      task: "完成迷你房屋地圖，和同伴互問物品位置。",
+    },
+    weather: {
+      topic: "天氣",
+      goal: "能聽懂天氣字詞，並使用 How's the weather? / It's... 回答。",
+      vocabulary: "sunny, rainy, cloudy, windy, hot, cold",
+      sentence: "How's the weather? / It's ___.",
+      focus: "從天氣觀察進入形容詞描述，搭配日常穿著或活動選擇。",
+      warmup: "看天氣圖示猜今天的天氣，學生舉牌回答。",
+      task: "完成一週天氣小報，向同學報告一天的天氣。",
+    },
+    activities: {
+      topic: "星期與休閒活動",
+      goal: "能說出星期與活動字詞，並表達自己在某天做的活動。",
+      vocabulary: "Monday, Friday, play, read, watch TV, ride a bike",
+      sentence: "What do you do on ___? / I ___.",
+      focus: "整合星期、活動動詞與 on 的時間用法。",
+      warmup: "用星期卡排序，再配對學生常做的活動。",
+      task: "完成週計畫表，訪問同學星期幾做什麼活動。",
+    },
+    places: {
+      topic: "地點、方向與社區",
+      goal: "能辨識社區地點並使用 Where is...? 問路或描述位置。",
+      vocabulary: "park, library, hospital, supermarket, left, right",
+      sentence: "Where is the ___? / Turn ___.",
+      focus: "結合地點名詞與方向指令，練習地圖閱讀與簡易問路。",
+      warmup: "看社區地圖指出地點，教師用 left/right 下指令。",
+      task: "兩人一組完成地圖尋寶，使用英語指路到指定地點。",
+    },
+    schoolLife: {
+      topic: "校園生活",
+      goal: "能描述校園活動與課堂物品，使用 I have... / I like... 表達學校生活。",
+      vocabulary: "class, English, music, PE, lunch, homework",
+      sentence: "What class do you have? / I have ___.",
+      focus: "從學生真實課表切入，練習科目與校園日常表達。",
+      warmup: "看課表圖卡猜科目，學生說出自己喜歡的課。",
+      task: "完成我的一天課表，和同伴進行課堂問答。",
+    },
+    appearance: {
+      topic: "個性與外貌",
+      goal: "能用形容詞描述人物外貌或個性，並介紹自己或朋友。",
+      vocabulary: "tall, short, strong, kind, funny, smart",
+      sentence: "He is ___. / She is ___.",
+      focus: "練習 he/she 代名詞與形容詞描述，避免只背單字。",
+      warmup: "用角色剪影猜人物特徵，學生說出一個形容詞。",
+      task: "製作朋友介紹卡，以三句英語描述人物。",
+    },
+    transport: {
+      topic: "交通工具",
+      goal: "能辨識交通工具並說明上學或旅行的交通方式。",
+      vocabulary: "bus, car, bike, train, airplane, walk",
+      sentence: "How do you go to school? / I go by ___.",
+      focus: "建立 by + 交通工具的表達，連結真實通勤經驗。",
+      warmup: "用交通聲音或圖片猜交通工具，學生模仿並說出單字。",
+      task: "完成交通調查表，統計同學如何到校。",
+    },
+    countries: {
+      topic: "國家與城市",
+      goal: "能辨識國家或城市名稱，並介紹來自哪裡或想去的地方。",
+      vocabulary: "Taiwan, Japan, Korea, the USA, city, country",
+      sentence: "Where are you from? / I am from ___.",
+      focus: "連結地圖、國家名稱與 from 的來源表達。",
+      warmup: "看國旗或地圖猜國家，學生說出已知地名。",
+      task: "選一個想去的國家，完成簡短旅行介紹。",
+    },
+    festival: {
+      topic: "節慶與文化",
+      goal: "能理解節慶字詞與日期，說出節慶活動或祝福語。",
+      vocabulary: "festival, Halloween, Christmas, New Year, date, card",
+      sentence: "Happy ___! / When is ___?",
+      focus: "以文化情境帶入節慶詞彙、日期與祝福語。",
+      warmup: "展示節慶物品或圖片，學生猜節慶名稱。",
+      task: "設計節慶卡片，向同學說一句祝福語。",
+    },
+    feelings: {
+      topic: "健康與感受",
+      goal: "能表達身體狀況與感受，使用 I feel... / I have...。",
+      vocabulary: "happy, sad, tired, sick, hungry, thirsty",
+      sentence: "How do you feel? / I feel ___.",
+      focus: "結合感受形容詞與健康情境，練習同理回應。",
+      warmup: "看表情卡猜感受，學生用臉部表情回應。",
+      task: "完成健康小對話，詢問同學感覺並給予建議。",
+    },
+    shopping: {
+      topic: "購物與價格",
+      goal: "能詢問價格並完成簡易購物對話。",
+      vocabulary: "dollar, cheap, expensive, buy, want, shop",
+      sentence: "How much is it? / It's ___ dollars.",
+      focus: "練習價格、數字與禮貌購物語句的整合。",
+      warmup: "用商品卡猜價格，學生說出數字。",
+      task: "小組開設迷你商店，完成買賣角色扮演。",
+    },
+    future: {
+      topic: "旅行與未來計畫",
+      goal: "能說出旅行或未來計畫，使用 I want to... / I am going to...。",
+      vocabulary: "travel, visit, plan, tomorrow, next week, vacation",
+      sentence: "I am going to ___. / I want to ___.",
+      focus: "從計畫情境進入未來表達，練習活動與時間副詞搭配。",
+      warmup: "看旅行圖片選目的地，學生說出想做的事。",
+      task: "規劃 Toki 的週末旅行，向同學分享兩個計畫。",
+    },
+    past: {
+      topic: "過去經驗",
+      goal: "能理解簡易過去式語句，說出曾經做過的活動。",
+      vocabulary: "went, played, visited, watched, yesterday, last week",
+      sentence: "I went to ___. / I played ___.",
+      focus: "以時間線建立過去概念，先理解再嘗試簡短表達。",
+      warmup: "看昨天活動圖片排序，學生猜角色做了什麼。",
+      task: "完成我的昨天活動卡，用兩句英語分享。",
+    },
+    compare: {
+      topic: "比較與描述",
+      goal: "能用形容詞比較人物或物品，理解 bigger / smaller 等比較級。",
+      vocabulary: "big, small, tall, short, long, fast",
+      sentence: "A is ___ than B.",
+      focus: "用視覺比較建立 than 的概念，避免抽象文法講解過多。",
+      warmup: "展示兩張圖片，學生用手勢表示大小或長短。",
+      task: "完成比較任務卡，介紹兩個角色或物品的差異。",
+    },
+    reading: {
+      topic: "閱讀挑戰",
+      goal: "能閱讀簡短故事或短文，找出主旨、細節與關鍵字。",
+      vocabulary: "story, title, character, place, problem, answer",
+      sentence: "The story is about ___.",
+      focus: "訓練看標題預測、圈關鍵字與用證據回答問題。",
+      warmup: "只看標題和圖片，學生預測故事內容。",
+      task: "完成故事線索表，說出一個角色、一個地點與一個重點。",
+    },
+    project: {
+      topic: "專題任務",
+      goal: "能整合已學字詞與句型，完成簡短介紹、海報或口頭發表。",
+      vocabulary: "poster, report, topic, idea, practice, present",
+      sentence: "My topic is ___. / I want to share ___.",
+      focus: "重視任務產出與口說表達，把已學語料放進真實作品。",
+      warmup: "觀看範例作品，學生找出可使用的英語句型。",
+      task: "完成一份迷你專題作品，向同學進行 30 秒發表。",
+    },
+    review: {
+      topic: "複習整合",
+      goal: "能統整前面單元的核心字詞與句型，完成跨單元任務。",
+      vocabulary: "review, word, sentence, question, answer, mission",
+      sentence: "I can say ___. / I can answer ___.",
+      focus: "以錯題與任務表現回顧弱點，安排跨題型複習。",
+      warmup: "用前幾課圖卡進行分類與快速回想。",
+      task: "完成跨單元闖關任務，檢核自己最熟與最需要補強的內容。",
+    },
     daily: {
+      topic: "生活英語",
       goal: "能理解本單元核心字詞與句型，並在生活情境中完成簡易溝通。",
       vocabulary: "hello, goodbye, please, thanks, yes, no",
       sentence: "Hello! / Thank you.",
+      focus: "以高頻生活用語建立聽說信心，再逐步延伸到完整句。",
       warmup: "以圖片、動作或情境問題喚起先備知識。",
       task: "設計兩人資訊差任務，讓學生必須使用目標句型完成挑戰。",
     },
@@ -1560,6 +1803,7 @@ function prepQuestionOptions(answer, lessonWords, fallbackWords) {
 function prepResourceMaterial(resourceKey, profile, useUploadedSource = false) {
   const terms = prepLessonTerms(profile, useUploadedSource);
   const lessonWords = terms.map((term) => term.english).filter(Boolean);
+  const topic = profile.topic || "本課";
   const fallbackWords = ["hello", "friend", "school", "teacher", "book", "apple"];
   const usableWords = [...new Set([...lessonWords, ...fallbackWords])].slice(0, 10);
   const makeWordQuestion = (word, index, mode = "image") => {
@@ -1605,34 +1849,34 @@ function prepResourceMaterial(resourceKey, profile, useUploadedSource = false) {
   const resources = {
     flashcards: {
       title: "圖像字卡包",
-      description: `本課 ${lessonWords.slice(0, 8).join("、")} 圖像字卡與辨識練習，可用於暖身、配對及口頭抽問。`,
+      description: `${topic}單元的 ${lessonWords.slice(0, 8).join("、")} 圖像字卡與辨識練習，可用於暖身、配對及口頭抽問。`,
       ability: "word",
       icon: "🖼️",
-      highlights: ["本課核心字詞圖卡", "中英配對活動", "可列印暖身任務"],
+      highlights: [`${topic}核心字詞圖卡`, `搭配「${profile.sentence}」替換練習`, `${topic}暖身配對任務`],
       questions: wordQuestions,
     },
     listening: {
       title: "聽力任務包",
-      description: "使用本課字詞與句型，從單字辨音、句子理解到情境回應逐步練習。",
+      description: `使用${topic}字詞與句型，從單字辨音、句子理解到情境回應逐步練習。`,
       ability: "echo",
       icon: "🎧",
-      highlights: ["核心字詞辨音", "本課句型聽辨", "基礎與挑戰題"],
+      highlights: [`${topic}關鍵字聽辨`, `聽懂「${profile.sentence}」句型`, "情境回應挑戰題"],
       questions: [...wordQuestions, ...sentenceQuestions].slice(0, 10),
     },
     differentiated: {
       title: "差異化課程包",
-      description: "依需要支持、符合程度與進階挑戰三種層次，提供可直接調整的差異化學習單。",
+      description: `依${topic}單元內容分成需要支持、符合程度與進階挑戰三種層次，提供可直接調整的差異化學習單。`,
       ability: "story",
       icon: "🧩",
-      highlights: ["支持版：圖像與二選一", "標準版：完整句型應用", "挑戰版：移除提示並延伸表達"],
+      highlights: [`支持版：${topic}圖像與二選一`, `標準版：${profile.sentence}應用`, "挑戰版：延伸到自主表達"],
       questions: [...wordQuestions.slice(0, 3), ...sentenceQuestions].slice(0, 7),
     },
     checkup: {
       title: "課程檢核區",
-      description: "整合本課字詞與句型複習題，可直接發布派發，也可先進入教材編輯器調整。",
+      description: `整合${topic}字詞與句型複習題，可直接發布派發，也可先進入教材編輯器調整。`,
       ability: "word",
       icon: "✅",
-      highlights: ["課後複習題", "答對率檢核", "可直接派發或編輯"],
+      highlights: [`${topic}課後複習題`, "答對率與易錯題檢核", "可直接派發或編輯"],
       questions: [...wordQuestions, ...sentenceQuestions].slice(0, 10),
     },
   };
@@ -1649,6 +1893,7 @@ function prepResourceMaterial(resourceKey, profile, useUploadedSource = false) {
 function prepResourceFiles(resourceKey, profile, useUploadedSource = false) {
   const material = prepResourceMaterial(resourceKey, profile, useUploadedSource);
   const words = prepLessonTerms(profile, useUploadedSource).map((term) => term.english).filter(Boolean);
+  const topic = profile.topic || "本課";
   const baseContent = {
     goal: profile.goal,
     vocabulary: words,
@@ -1667,9 +1912,9 @@ function prepResourceFiles(resourceKey, profile, useUploadedSource = false) {
         content: {
           ...baseContent,
           level: "需要支持",
-          teacherGuide: "先教 4 個核心字詞，逐張指圖示範，保留中文提示與句首。",
-          activities: ["看圖圈選正確單字", "單字與圖片連線", "跟讀後替換一個字詞完成句子"],
-          check: "能辨識 4 個核心字詞，並在提示下完成 1 句口語表達。",
+          teacherGuide: `先教 4 個${topic}核心字詞，逐張指圖示範，保留中文提示與句首。`,
+          activities: [`看圖圈選${topic}正確單字`, `${topic}單字與圖片連線`, `跟讀後替換一個${topic}字詞完成句子`],
+          check: `能辨識 4 個${topic}核心字詞，並在提示下完成 1 句口語表達。`,
           questions: material.questions.slice(0, 4),
         },
       },
@@ -1683,9 +1928,9 @@ function prepResourceFiles(resourceKey, profile, useUploadedSource = false) {
         content: {
           ...baseContent,
           level: "符合程度",
-          teacherGuide: "提供關鍵字但不提供完整答案，安排兩人資訊差與三輪問答。",
-          activities: ["完成字詞分類", "依圖片寫出完整句", "與同學完成三次問答並記錄答案"],
-          check: "能正確使用核心字詞，並以完整句完成問答。",
+          teacherGuide: `提供${topic}關鍵字但不提供完整答案，安排兩人資訊差與三輪問答。`,
+          activities: [`完成${topic}字詞分類`, "依圖片寫出完整句", `與同學完成三次「${profile.sentence}」問答並記錄答案`],
+          check: `能正確使用${topic}核心字詞，並以完整句完成問答。`,
           questions: material.questions.slice(0, 7),
         },
       },
@@ -1699,9 +1944,9 @@ function prepResourceFiles(resourceKey, profile, useUploadedSource = false) {
         content: {
           ...baseContent,
           level: "進階挑戰",
-          teacherGuide: "移除句型支架，要求加入原因、數量或第三人稱資訊。",
-          activities: ["自行設計兩個訪問題目", "訪問兩位同學並整理結果", "使用 2–3 句英語口頭報告"],
-          check: "能靈活替換語料、補充新訊息並完成自主表達。",
+          teacherGuide: `移除${topic}句型支架，要求加入原因、數量、時間或第三人稱資訊。`,
+          activities: [`自行設計兩個${topic}訪問題目`, "訪問兩位同學並整理結果", "使用 2–3 句英語口頭報告"],
+          check: `能靈活替換${topic}語料、補充新訊息並完成自主表達。`,
           questions: material.questions,
         },
       },
@@ -1713,7 +1958,7 @@ function prepResourceFiles(resourceKey, profile, useUploadedSource = false) {
       audience: "teacher",
       content: {
         ...baseContent,
-        usage: ["暖身：快速閃卡命名", "分組：圖卡與字卡配對", "口說：抽卡後套用本課句型"],
+        usage: [`暖身：快速閃卡命名${topic}字詞`, `分組：${topic}圖卡與字卡配對`, `口說：抽卡後套用「${profile.sentence}」句型`],
         cards: words.map((word) => ({ word, visual: prepWordVisual(word) })),
       },
     },
@@ -1722,7 +1967,7 @@ function prepResourceFiles(resourceKey, profile, useUploadedSource = false) {
       audience: "teacher",
       content: {
         ...baseContent,
-        usage: ["第一輪只聽單字並指圖", "第二輪聽句子選答案", "第三輪兩人互相朗讀與判斷"],
+        usage: [`第一輪只聽${topic}單字並指圖`, `第二輪聽「${profile.sentence}」句子選答案`, `第三輪兩人互相朗讀${topic}句子並判斷`],
         audioScript: material.questions.map((question) => question.speech).filter(Boolean),
       },
     },
@@ -1731,8 +1976,8 @@ function prepResourceFiles(resourceKey, profile, useUploadedSource = false) {
       audience: "student",
       content: {
         ...baseContent,
-        instructions: "完成本課字詞與句型複習題，教師可查看答對率與易錯內容。",
-        check: "80% 以上表示達成本課目標；未達 80% 建議改派支持版學習單。",
+        instructions: `完成${topic}字詞與句型複習題，教師可查看答對率與易錯內容。`,
+        check: `80% 以上表示達成${topic}單元目標；未達 80% 建議改派支持版學習單。`,
       },
     },
   };
@@ -1789,6 +2034,7 @@ function prepSourceInsights(profile, useUploadedSource = false) {
       </div>
       <div class="prep-insight-grid">
         <div><b>本課核心語料</b><div class="prep-term-list">${termLabels || "<span>上傳教材後自動整理</span>"}</div></div>
+        <div><b>本課教學重點</b><p>${escapeHTML(profile.focus || "依本課核心字詞與句型安排理解、操練與應用任務。")}</p></div>
         <div><b>教學調整建議</b><p>${hasUploadedSource
           ? "先用教材中的原句做理解輸入，再將核心字詞放入圖片辨識、聽力選擇與口說任務；離堂前以不同題型再次檢核。"
           : "先確認學生能辨識核心字詞，再進入完整句型；同一語料至少安排一次理解任務與一次表達任務。"}</p></div>
@@ -1854,7 +2100,7 @@ function renderPrepCenter(user) {
     </section>
     ${prepSourceInsights(profile, false)}
     <section class="prep-plan-grid">
-      <article class="card prep-plan-card goal"><span>01</span><h3>學習目標</h3><p>${profile.goal}</p><b>核心字詞</b><small>${profile.vocabulary}</small><b>核心句型</b><small>${profile.sentence}</small></article>
+      <article class="card prep-plan-card goal"><span>01</span><h3>學習目標</h3><p>${profile.goal}</p><b>本課重點</b><small>${profile.focus}</small><b>核心字詞</b><small>${profile.vocabulary}</small><b>核心句型</b><small>${profile.sentence}</small></article>
       <article class="card prep-plan-card flow"><span>02</span><h3>40 分鐘課程流程</h3><ol><li>暖身 5 分：${profile.warmup}</li><li>字詞輸入 10 分：圖像、發音、動作三路輸入。</li><li>句型操練 10 分：先全班、再同桌問答。</li><li>任務應用 12 分：${profile.task}</li><li>離堂檢核 3 分：一題聽力＋一題口說。</li></ol></article>
       <article class="card prep-plan-card differentiation"><span>03</span><h3>差異化教學建議做法</h3>
         <div><b>需要支持｜圖像與口語支架</b><p><strong>教師做法：</strong>先示範 4 個核心字詞，提供圖片、中文提示與句首。<br><strong>學生任務：</strong>完成看圖二選一，再跟讀並替換 1 個字詞。<br><strong>檢核：</strong>能指出圖片並說出單字，即完成基礎目標。</p></div>
