@@ -1960,6 +1960,262 @@ button {
   font-size: 10px;
 }
 
+.autonomy-hub {
+  position: relative;
+  margin: 0 0 24px;
+  padding: 24px;
+  overflow: hidden;
+  border: 2px solid #d9d3ff;
+  border-radius: 30px;
+  background:
+    radial-gradient(circle at 8% 8%, rgba(255, 226, 120, 0.38), transparent 28%),
+    radial-gradient(circle at 92% 0%, rgba(100, 221, 208, 0.28), transparent 32%),
+    linear-gradient(135deg, #fff, #f3f0ff 58%, #eafcff);
+  box-shadow: var(--shadow-sm);
+}
+
+.autonomy-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 310px;
+  gap: 22px;
+  align-items: stretch;
+}
+
+.autonomy-hero h2 {
+  margin: 5px 0 9px;
+  font-size: clamp(28px, 4vw, 44px);
+}
+
+.autonomy-hero p {
+  max-width: 760px;
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.75;
+}
+
+.autonomy-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.cefr-route-card {
+  padding: 20px;
+  border: 1px solid rgba(108, 78, 227, 0.2);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.7);
+}
+
+.cefr-route-card small,
+.cefr-route-card strong,
+.cefr-route-card em {
+  display: block;
+}
+
+.cefr-route-card small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.cefr-route-card strong {
+  margin-top: 5px;
+  color: var(--primary-dark);
+  font-size: 20px;
+}
+
+.cefr-route-card p {
+  margin: 9px 0 14px;
+  font-size: 13px;
+}
+
+.cefr-route-card em {
+  margin-top: 12px;
+  color: var(--primary-dark);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.cefr-ladder {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+
+.cefr-ladder span {
+  padding: 7px 4px;
+  border-radius: 999px;
+  background: #eeeafc;
+  color: #867bb0;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.cefr-ladder span.active {
+  color: #fff;
+  background: linear-gradient(135deg, var(--primary), #22b8ae);
+}
+
+.autonomy-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 22px;
+}
+
+.autonomy-card {
+  position: relative;
+  padding: 17px;
+  border: 1px solid color-mix(in srgb, var(--challenge-color) 24%, white);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: 0 14px 28px rgba(46, 34, 100, 0.08);
+}
+
+.autonomy-card.recommended {
+  border-width: 2px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.95), color-mix(in srgb, var(--challenge-color) 10%, white));
+}
+
+.autonomy-card.recommended::after {
+  content: "今日建議";
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  color: #fff;
+  background: var(--challenge-color);
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.autonomy-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.autonomy-card-head > span {
+  width: 43px;
+  height: 43px;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--challenge-color) 16%, white);
+  font-size: 24px;
+}
+
+.autonomy-card-head b,
+.autonomy-card-head small {
+  display: block;
+}
+
+.autonomy-card-head small,
+.autonomy-card p,
+.autonomy-card footer small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.autonomy-card p {
+  min-height: 62px;
+  line-height: 1.55;
+}
+
+.autonomy-card footer {
+  display: grid;
+  gap: 10px;
+  margin-top: 13px;
+}
+
+.autonomy-card .primary-btn {
+  width: 100%;
+}
+
+.autonomy-badges {
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+  margin-top: 18px;
+  padding: 16px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.autonomy-badges h3 {
+  margin: 0 0 5px;
+}
+
+.autonomy-badges p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.task-badge-row {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.task-badge {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--badge-color) 18%, white);
+  border-radius: 17px;
+  background: #f7f5fb;
+  filter: grayscale(0.65);
+  opacity: 0.72;
+}
+
+.task-badge.unlocked {
+  background: linear-gradient(135deg, #fff, color-mix(in srgb, var(--badge-color) 10%, white));
+  filter: none;
+  opacity: 1;
+}
+
+.task-badge > span {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--badge-color) 18%, white);
+}
+
+.task-badge b,
+.task-badge small,
+.task-badge em {
+  display: block;
+}
+
+.task-badge b {
+  font-size: 11px;
+}
+
+.task-badge small {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.task-badge em {
+  color: var(--primary-dark);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 900;
+}
+
 .theme-badge-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(110px, 1fr));
@@ -4469,6 +4725,19 @@ td {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .autonomy-hero,
+  .autonomy-badges {
+    grid-template-columns: 1fr;
+  }
+
+  .autonomy-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .task-badge-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .momentum-strip {
     grid-template-columns: 1fr;
   }
@@ -4660,6 +4929,25 @@ td {
 
   .theme-badge-grid {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .autonomy-hub {
+    padding: 18px;
+    border-radius: 24px;
+  }
+
+  .autonomy-grid,
+  .task-badge-row {
+    grid-template-columns: 1fr;
+  }
+
+  .autonomy-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .autonomy-actions button {
+    width: 100%;
   }
 
   .resource-pack-grid,

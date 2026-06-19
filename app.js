@@ -141,6 +141,22 @@ const worldStages = [
   { id: "write", name: "拼字工坊", label: "寫", icon: "✏️", ability: "spell", description: "辨認正確拼字，修復文字" },
 ];
 
+const cefrProgression = [
+  { level: "Pre-A1", title: "啟航新手", target: "聽懂與認讀國小基礎單字、問候語和短句。", xp: 0 },
+  { level: "A1", title: "日常溝通者", target: "能用簡短句子完成自我介紹、喜好、家庭與校園情境。", xp: 500 },
+  { level: "A2", title: "任務冒險家", target: "能理解較長指令與短文，並用句型完成生活任務。", xp: 1400 },
+  { level: "B1", title: "故事探索者", target: "能整理資訊、描述經驗，並進行簡短說明與發表。", xp: 3000 },
+  { level: "B2", title: "語宙領航員", target: "能跨主題整合閱讀、聽力與口說，表達較完整觀點。", xp: 5200 },
+];
+
+const autonomousChallengeRoutes = [
+  { id: "echo", label: "聽力挑戰", action: "聽懂訊號", icon: "🎧", reward: "回音偵察徽章", copy: "辨識單字、句子與角色指令，提升聲音雷達。" },
+  { id: "voice", label: "口說挑戰", action: "勇敢開口", icon: "🎙️", reward: "勇敢開口徽章", copy: "跟著情境句開口說，累積語音引擎能量。" },
+  { id: "story", label: "閱讀挑戰", action: "破解線索", icon: "📖", reward: "故事解碼徽章", copy: "讀圖片、短句與故事線索，強化解碼視野。" },
+  { id: "spell", label: "拼寫挑戰", action: "修復文字", icon: "✏️", reward: "拼字工藝徽章", copy: "辨認正確拼字與句型，修復語言裝置。" },
+  { id: "word", label: "單字挑戰", action: "收集晶石", icon: "💎", reward: "語彙晶石徽章", copy: "收集國小核心字詞，讓 Word Power 穩定升級。" },
+];
+
 const questionBanks = {
   word: {
     preA1: [
@@ -706,6 +722,7 @@ function renderPlayerHome(user) {
     ${playerHeader(user, `嗨，${escapeHTML(user.account)}！`, "今天也和 Toki 一起前進一點吧。")}
     ${renderPlayerMomentum(user)}
     ${renderLevelJourney(user)}
+    ${renderAutonomousChallengeHub(user)}
     ${renderPlayerAssignments()}
     ${renderMissions()}
     ${renderTrainingMap(user)}
@@ -768,6 +785,97 @@ function renderThemeBadges(user) {
               <small>${unlocked ? "已解鎖" : "完成主題關卡解鎖"}</small>
             </article>`;
         }).join("")}
+      </div>
+    </section>`;
+}
+
+function normalizedCefrLevel(user) {
+  const raw = String(user?.cefrLevel || "Pre-A1").toUpperCase();
+  if (raw.startsWith("PRE")) return "Pre-A1";
+  return cefrProgression.find((item) => raw.startsWith(item.level))?.level || "Pre-A1";
+}
+
+function cefrStepFor(user) {
+  const currentLevel = normalizedCefrLevel(user);
+  const index = cefrProgression.findIndex((item) => item.level === currentLevel);
+  return {
+    current: cefrProgression[Math.max(0, index)],
+    next: cefrProgression[Math.min(cefrProgression.length - 1, index + 1)],
+    index: Math.max(0, index),
+  };
+}
+
+function renderTaskBadges(user, actualAbilities) {
+  const badgeLevels = [
+    { key: "bronze", label: "任務徽章", threshold: 20 },
+    { key: "silver", label: "進階徽章", threshold: 50 },
+    { key: "gold", label: "精熟徽章", threshold: 80 },
+  ];
+  return `
+    <div class="task-badge-row">
+      ${autonomousChallengeRoutes.map((route) => {
+        const ability = actualAbilities.find((item) => item.id === route.id);
+        const unlocked = badgeLevels.filter((badge) => (ability?.value || 0) >= badge.threshold);
+        const nextBadge = badgeLevels.find((badge) => (ability?.value || 0) < badge.threshold);
+        return `
+          <article class="task-badge ${unlocked.length ? "unlocked" : ""}" style="--badge-color:${ability?.color || "#6c4ee3"}">
+            <span>${route.icon}</span>
+            <div><b>${route.reward}</b><small>${nextBadge ? `能力值 ${nextBadge.threshold} 解鎖${nextBadge.label}` : "三階徽章已集滿"}</small></div>
+            <em>${unlocked.length}/3</em>
+          </article>`;
+      }).join("")}
+    </div>`;
+}
+
+function renderAutonomousChallengeHub(user) {
+  const actualAbilities = playerAbilities(user);
+  const weakest = [...actualAbilities].sort((a, b) => a.value - b.value)[0];
+  const strongest = [...actualAbilities].sort((a, b) => b.value - a.value)[0];
+  const cefrStep = cefrStepFor(user);
+  const routeCards = autonomousChallengeRoutes.map((route) => {
+    const ability = actualAbilities.find((item) => item.id === route.id);
+    const isRecommended = route.id === weakest.id;
+    const isStrength = route.id === strongest.id && strongest.value > 0;
+    return `
+      <article class="autonomy-card ${isRecommended ? "recommended" : ""}" style="--challenge-color:${ability.color}">
+        <div class="autonomy-card-head">
+          <span>${route.icon}</span>
+          <div><b>${route.label}</b><small>${ability.shortName}｜目前 ${ability.value}</small></div>
+        </div>
+        <p>${route.copy}</p>
+        <div class="mini-progress"><span style="width:${ability.value}%;background:${ability.color}"></span></div>
+        <footer>
+          <small>${isRecommended ? "今日建議補強" : isStrength ? "你的強項挑戰" : `完成 10 題賺 XP`}</small>
+          <button class="primary-btn autonomy-start" data-ability="${route.id}">${route.action}</button>
+        </footer>
+      </article>`;
+  }).join("");
+  return `
+    <section class="autonomy-hub">
+      <div class="autonomy-hero">
+        <div>
+          <span class="quest-eyebrow">DAILY SKILL QUEST</span>
+          <h2>自主挑戰航線</h2>
+          <p>每天選一條聽、說、讀、寫或單字路線挑戰 10 題。題目依你的 CEFR 程度逐步變難，答題紀錄會同步成為老師端的學習診斷證據。</p>
+          <div class="autonomy-actions">
+            <button class="primary-btn autonomy-start" data-ability="${weakest.id}">挑戰今日建議：${weakest.name}</button>
+            <button class="secondary-btn" data-page="world">前往主題國家收集徽章</button>
+          </div>
+        </div>
+        <div class="cefr-route-card">
+          <small>目前英語階段</small>
+          <strong>${cefrStep.current.level}｜${cefrStep.current.title}</strong>
+          <p>${cefrStep.current.target}</p>
+          <div class="cefr-ladder">
+            ${cefrProgression.map((step, index) => `<span class="${index <= cefrStep.index ? "active" : ""}">${step.level}</span>`).join("")}
+          </div>
+          <em>${cefrStep.current.level === "B2" ? "已到目前最高分級，繼續挑戰高難度整合題。" : `下一階：${cefrStep.next.level}｜${cefrStep.next.title}`}</em>
+        </div>
+      </div>
+      <div class="autonomy-grid">${routeCards}</div>
+      <div class="autonomy-badges">
+        <div><h3>任務徽章進度</h3><p>能力值達 20、50、80 會解鎖三階徽章；主題徽章則在世界地圖完成主題聽說讀寫四關後取得。</p></div>
+        ${renderTaskBadges(user, actualAbilities)}
       </div>
     </section>`;
 }
@@ -4442,6 +4550,10 @@ function bindEvents() {
   });
 
   document.querySelectorAll(".map-location").forEach((button) => button.addEventListener("click", () => {
+    startGame("ability", button.dataset.ability);
+  }));
+
+  document.querySelectorAll(".autonomy-start").forEach((button) => button.addEventListener("click", () => {
     startGame("ability", button.dataset.ability);
   }));
 
