@@ -1454,35 +1454,42 @@ function renderSavedResourcePreview(resource) {
 function prepUnitProfile(version, unit) {
   const joined = `${version} ${unit}`;
   const has = (...patterns) => patterns.some((pattern) => joined.includes(pattern));
-  const theme = has("Review", "複習") ? "review"
-    : has("Culture", "文化", "節慶", "Festival", "日期與節日") ? "festival"
-      : has("Reading", "閱讀") ? "reading"
-        : has("專題", "畢業") ? "project"
-          : has("過去經驗") ? "past"
-            : has("未來計畫", "旅行與計畫") ? "future"
-              : has("比較", "描述") ? "compare"
-                : has("購物", "價格") ? "shopping"
-                  : has("健康", "感受") ? "feelings"
-                    : has("國家", "城市") ? "countries"
-                      : has("交通") ? "transport"
-                        : has("社區", "地點", "方向") ? "places"
-                          : has("休閒", "興趣", "星期與活動") ? "activities"
-                            : has("校園生活") ? "schoolLife"
-                              : has("個性", "外貌") ? "appearance"
-                                : has("天氣") ? "weather"
-                                  : has("房間", "居家") ? "home"
-                                    : has("服裝") ? "clothes"
-                                      : has("能力", "動作") ? "actions"
-                                        : has("身體") ? "body"
-                                          : has("食物", "點餐") ? "food"
-                                            : has("家人", "職業") ? "family"
-                                              : has("動物") ? "animals"
-                                                : has("顏色", "數字", "年齡") ? "colorsNumbers"
-                                                  : has("教室", "學用品") ? "school"
-                                                    : has("時間", "作息") ? "time"
-                                                      : has("字母") ? "alphabet"
-                                                        : has("朋友", "人物", "問候", "自我", "介紹", "Starter") ? "intro"
-                                                        : "daily";
+  const theme = has("基礎句型整合") ? "basicPatterns"
+    : has("生活英語暖身") ? "dailyWarmup"
+      : has("進階句型暖身") ? "advancedPatterns"
+        : has("主題式單字") ? "thematicWords"
+          : has("生活情境對話") ? "dialogue"
+            : has("跨領域任務") ? "crossCurricular"
+              : has("家庭與日常") ? "familyDaily"
+                : has("Review", "複習") ? "review"
+                  : has("Culture", "文化", "節慶", "Festival", "日期與節日") ? "festival"
+                    : has("Reading", "閱讀") ? "reading"
+                      : has("專題", "畢業") ? "project"
+                        : has("過去經驗") ? "past"
+                          : has("未來計畫", "旅行與計畫") ? "future"
+                            : has("比較", "描述") ? "compare"
+                              : has("購物", "價格") ? "shopping"
+                                : has("健康", "感受") ? "feelings"
+                                  : has("國家", "城市") ? "countries"
+                                    : has("交通") ? "transport"
+                                      : has("社區", "地點", "方向") ? "places"
+                                        : has("休閒", "興趣", "星期與活動") ? "activities"
+                                          : has("校園生活") ? "schoolLife"
+                                            : has("個性", "外貌") ? "appearance"
+                                              : has("天氣") ? "weather"
+                                                : has("房間", "居家") ? "home"
+                                                  : has("服裝") ? "clothes"
+                                                    : has("能力", "動作") ? "actions"
+                                                      : has("身體") ? "body"
+                                                        : has("食物", "點餐") ? "food"
+                                                          : has("家人", "職業") ? "family"
+                                                            : has("動物") ? "animals"
+                                                              : has("顏色", "數字", "年齡") ? "colorsNumbers"
+                                                                : has("教室", "學用品") ? "school"
+                                                                  : has("時間", "作息") ? "time"
+                                                                    : has("字母") ? "alphabet"
+                                                                      : has("朋友", "人物", "問候", "自我", "介紹", "Starter") ? "intro"
+                                                                        : "daily";
   const profiles = {
     alphabet: {
       topic: "字母與問候",
@@ -1511,6 +1518,15 @@ function prepUnitProfile(version, unit) {
       warmup: "出示角色卡，請學生猜人物關係並說出已知單字。",
       task: "製作迷你家庭角色卡，以兩句英語完成介紹。",
     },
+    familyDaily: {
+      topic: "家庭與日常",
+      goal: "能介紹家庭成員與日常活動，使用 This is... / I usually... 描述生活。",
+      vocabulary: "family, home, dinner, homework, help, together",
+      sentence: "This is my ___. / I usually ___ at home.",
+      focus: "連結家庭角色與日常活動，練習介紹家人和描述例行生活。",
+      warmup: "看家庭日常圖片，學生說出人物關係和正在做的事。",
+      task: "完成家庭日常小書，向同學介紹一位家人與一件日常活動。",
+    },
     school: {
       topic: "教室與學用品",
       goal: "能辨識教室物品並使用 What's this? / It's a... 進行問答。",
@@ -1537,6 +1553,33 @@ function prepUnitProfile(version, unit) {
       focus: "建立初次見面情境，練習姓名問答與自然回應。",
       warmup: "播放角色見面情境，學生找出聽到的問候語。",
       task: "進行角色交換卡活動，和三位同學完成英語自我介紹。",
+    },
+    basicPatterns: {
+      topic: "基礎句型整合",
+      goal: "能整合已學的問答句型，穩定使用完整句回答課堂問題。",
+      vocabulary: "question, answer, sentence, word, yes, no",
+      sentence: "Can you say ___? / Yes, I can.",
+      focus: "回收前面學過的基本問答，讓學生從單字回答進步到完整句表達。",
+      warmup: "用句型拼圖卡重組問句與答句，快速確認學生熟悉度。",
+      task: "小組抽任務卡，完成三組問答並把答案改寫成完整句。",
+    },
+    dailyWarmup: {
+      topic: "生活英語暖身",
+      goal: "能在課堂與日常情境中使用常見英語指令、請求與回應。",
+      vocabulary: "hello, please, thanks, help, wait, ready",
+      sentence: "Are you ready? / Yes, I am.",
+      focus: "把禮貌語、課堂指令與即時回應變成學生每天敢開口的例行語。",
+      warmup: "教師說出生活情境，學生用對應英語短句快速回應。",
+      task: "兩人一組完成生活英語情境卡，練習請求、道謝與回應。",
+    },
+    advancedPatterns: {
+      topic: "進階句型暖身",
+      goal: "能複習並連結進階句型，嘗試加入原因、時間或個人想法。",
+      vocabulary: "because, before, after, usually, want, can",
+      sentence: "I can ___ because ___.",
+      focus: "協助學生把短句延伸成有理由、有時間線或有個人選擇的表達。",
+      warmup: "出示半句提示，學生補上原因或時間，組成較完整的句子。",
+      task: "完成 Toki 任務選擇單，用 because 說明自己的任務選擇。",
     },
     colorsNumbers: {
       topic: "顏色、數字與年齡",
@@ -1726,6 +1769,33 @@ function prepUnitProfile(version, unit) {
       focus: "重視任務產出與口說表達，把已學語料放進真實作品。",
       warmup: "觀看範例作品，學生找出可使用的英語句型。",
       task: "完成一份迷你專題作品，向同學進行 30 秒發表。",
+    },
+    thematicWords: {
+      topic: "主題式單字",
+      goal: "能依主題分類、記憶並運用核心單字，建立可延伸的字詞網絡。",
+      vocabulary: "topic, word, picture, group, match, review",
+      sentence: "This word is ___. / It goes with ___.",
+      focus: "用分類、圖像與聯想建立字詞網絡，避免只背單字表。",
+      warmup: "出示混合字卡，學生依主題快速分類並說出分類理由。",
+      task: "小組建立一張主題字詞地圖，並用兩句英語介紹分類方式。",
+    },
+    dialogue: {
+      topic: "生活情境對話",
+      goal: "能理解並演練常見生活情境中的問答、請求與禮貌回應。",
+      vocabulary: "please, thank you, sorry, help, ask, answer",
+      sentence: "Can I ___? / Yes, please.",
+      focus: "以真實情境和角色扮演練習禮貌表達與即時回應。",
+      warmup: "播放或示範一段短對話，學生找出禮貌用語與關鍵句。",
+      task: "兩人一組抽情境卡，改編並演出三句以上的生活對話。",
+    },
+    crossCurricular: {
+      topic: "跨領域任務",
+      goal: "能使用英語完成跨領域觀察、分類、整理或簡短發表。",
+      vocabulary: "science, art, map, data, idea, project",
+      sentence: "I found ___. / My idea is ___.",
+      focus: "讓英語成為完成任務的工具，結合觀察、整理與表達。",
+      warmup: "看圖片或資料卡，學生說出可用的英語關鍵字。",
+      task: "完成一個跨領域小任務，整理資料後用英語分享發現。",
     },
     review: {
       topic: "複習整合",
