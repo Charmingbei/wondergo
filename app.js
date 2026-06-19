@@ -723,9 +723,9 @@ function renderPlayerHome(user) {
     ${renderPlayerMomentum(user)}
     ${renderLevelJourney(user)}
     ${renderAutonomousChallengeHub(user)}
+    ${renderTrainingMap(user)}
     ${renderPlayerAssignments()}
     ${renderMissions()}
-    ${renderTrainingMap(user)}
     ${renderAbilityDashboard(user)}
     ${renderThemeBadges(user)}`;
 }
@@ -830,35 +830,16 @@ function renderTaskBadges(user, actualAbilities) {
 function renderAutonomousChallengeHub(user) {
   const actualAbilities = playerAbilities(user);
   const weakest = [...actualAbilities].sort((a, b) => a.value - b.value)[0];
-  const strongest = [...actualAbilities].sort((a, b) => b.value - a.value)[0];
   const cefrStep = cefrStepFor(user);
-  const routeCards = autonomousChallengeRoutes.map((route) => {
-    const ability = actualAbilities.find((item) => item.id === route.id);
-    const isRecommended = route.id === weakest.id;
-    const isStrength = route.id === strongest.id && strongest.value > 0;
-    return `
-      <article class="autonomy-card ${isRecommended ? "recommended" : ""}" style="--challenge-color:${ability.color}">
-        <div class="autonomy-card-head">
-          <span>${route.icon}</span>
-          <div><b>${route.label}</b><small>${ability.shortName}｜目前 ${ability.value}</small></div>
-        </div>
-        <p>${route.copy}</p>
-        <div class="mini-progress"><span style="width:${ability.value}%;background:${ability.color}"></span></div>
-        <footer>
-          <small>${isRecommended ? "今日建議補強" : isStrength ? "你的強項挑戰" : `完成 10 題賺 XP`}</small>
-          <button class="primary-btn autonomy-start" data-ability="${route.id}">${route.action}</button>
-        </footer>
-      </article>`;
-  }).join("");
   return `
     <section class="autonomy-hub">
       <div class="autonomy-hero">
         <div>
           <span class="quest-eyebrow">DAILY SKILL QUEST</span>
           <h2>自主挑戰航線</h2>
-          <p>每天選一條聽、說、讀、寫或單字路線挑戰 10 題。題目依你的 CEFR 程度逐步變難，答題紀錄會同步成為老師端的學習診斷證據。</p>
+          <p>每天從下方的五大能力訓練館地圖出發，選一座場館挑戰 10 題。題目依你的 CEFR 程度逐步變難，答題紀錄會同步成為老師端的學習診斷證據。</p>
           <div class="autonomy-actions">
-            <button class="primary-btn autonomy-start" data-ability="${weakest.id}">挑戰今日建議：${weakest.name}</button>
+            <button class="primary-btn autonomy-start" data-ability="${weakest.id}">直接挑戰今日建議：${weakest.name}</button>
             <button class="secondary-btn" data-page="world">前往主題國家收集徽章</button>
           </div>
         </div>
@@ -872,7 +853,6 @@ function renderAutonomousChallengeHub(user) {
           <em>${cefrStep.current.level === "B2" ? "已到目前最高分級，繼續挑戰高難度整合題。" : `下一階：${cefrStep.next.level}｜${cefrStep.next.title}`}</em>
         </div>
       </div>
-      <div class="autonomy-grid">${routeCards}</div>
       <div class="autonomy-badges">
         <div><h3>任務徽章進度</h3><p>能力值達 20、50、80 會解鎖三階徽章；主題徽章則在世界地圖完成主題聽說讀寫四關後取得。</p></div>
         ${renderTaskBadges(user, actualAbilities)}
