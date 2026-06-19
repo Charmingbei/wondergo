@@ -937,14 +937,20 @@ function renderTrainingMap(user) {
         <path class="map-coast coast-main" d="M92 365 C68 270 145 205 245 222 C318 114 445 101 515 184 C616 128 745 162 782 258 C902 264 970 345 925 440 C866 554 635 530 510 496 C382 560 170 532 92 365 Z" />
         <path class="map-coast coast-left" d="M35 438 C75 386 155 385 210 429 C172 500 78 506 35 438 Z" />
         <path class="map-coast coast-right" d="M812 122 C870 82 951 104 982 170 C934 215 842 206 812 122 Z" />
-        <path class="quest-route-shadow" d="M120 370 C225 230 300 300 390 238 C498 164 562 326 666 244 C762 168 802 296 890 384" />
-        <path class="quest-route" d="M120 370 C225 230 300 300 390 238 C498 164 562 326 666 244 C762 168 802 296 890 384" />
-        <g class="map-node node-start"><circle cx="120" cy="370" r="24" /><text x="120" y="376">START</text></g>
-        <g class="map-node"><circle cx="250" cy="250" r="20" /><text x="250" y="256">1</text></g>
-        <g class="map-node"><circle cx="390" cy="238" r="20" /><text x="390" y="256">2</text></g>
-        <g class="map-node"><circle cx="540" cy="276" r="20" /><text x="540" y="283">3</text></g>
-        <g class="map-node"><circle cx="700" cy="234" r="20" /><text x="700" y="241">4</text></g>
-        <g class="map-node"><circle cx="838" cy="335" r="20" /><text x="838" y="342">5</text></g>
+        <path class="quest-route-shadow main-route" d="M115 372 C205 300 260 255 360 266 C455 278 482 198 570 226 C654 252 704 208 782 260 C842 300 858 358 922 396" />
+        <path class="quest-route main-route" d="M115 372 C205 300 260 255 360 266 C455 278 482 198 570 226 C654 252 704 208 782 260 C842 300 858 358 922 396" />
+        <path class="quest-route-shadow branch-route branch-one" d="M355 268 C302 332 238 358 170 430" />
+        <path class="quest-route branch-route branch-one" d="M355 268 C302 332 238 358 170 430" />
+        <path class="quest-route-shadow branch-route branch-two" d="M575 226 C560 318 626 382 720 390" />
+        <path class="quest-route branch-route branch-two" d="M575 226 C560 318 626 382 720 390" />
+        <path class="quest-route-shadow branch-route branch-three" d="M780 260 C812 190 870 166 942 146" />
+        <path class="quest-route branch-route branch-three" d="M780 260 C812 190 870 166 942 146" />
+        <g class="map-node node-start"><circle cx="115" cy="372" r="24" /><text x="115" y="379">GO</text></g>
+        <g class="map-node"><circle cx="250" cy="288" r="13" /></g>
+        <g class="map-node"><circle cx="412" cy="260" r="13" /></g>
+        <g class="map-node"><circle cx="572" cy="226" r="13" /></g>
+        <g class="map-node"><circle cx="748" cy="244" r="13" /></g>
+        <g class="map-node"><circle cx="874" cy="355" r="13" /></g>
         <g class="map-goal"><path d="M866 392 h58 v64 h-58 Z" /><path d="M856 392 h78 l-39 -38 Z" /><text x="895" y="482">GOAL</text></g>
         <g class="map-mountains"><path d="M185 205 l38 -72 l38 72 Z" /><path d="M235 218 l48 -90 l48 90 Z" /><path d="M292 203 l34 -62 l34 62 Z" /></g>
         <g class="map-forest"><circle cx="690" cy="370" r="22" /><circle cx="730" cy="345" r="25" /><circle cx="760" cy="382" r="21" /><rect x="684" y="385" width="14" height="28" rx="5" /><rect x="724" y="365" width="15" height="31" rx="5" /><rect x="754" y="398" width="13" height="26" rx="5" /></g>
@@ -954,7 +960,7 @@ function renderTrainingMap(user) {
         ${abilities.map((ability, index) => `
           <button class="map-location location-${index + 1}" data-ability="${ability.id}" style="--hall-color:${ability.color}">
             <span class="hall-island" aria-hidden="true"></span>
-            <span class="map-pin">${index + 1}</span>
+            <span class="map-pin" aria-hidden="true">✦</span>
             <span class="hall-art"><i>${ability.scene}</i></span>
             <span class="hall-copy">
               <strong>${ability.name}</strong>

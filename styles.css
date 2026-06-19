@@ -935,24 +935,36 @@ button {
 .quest-route-shadow {
   fill: none;
   stroke: rgba(82, 112, 76, 0.22);
-  stroke-width: 34;
+  stroke-width: 28;
   stroke-linecap: round;
 }
 
 .quest-route {
   fill: none;
   stroke: url(#questRoute);
-  stroke-width: 17;
-  stroke-dasharray: 18 18;
+  stroke-width: 14;
+  stroke-dasharray: 20 20;
   stroke-linecap: round;
   filter: drop-shadow(0 5px 0 rgba(116, 139, 82, 0.22));
+}
+
+.branch-route {
+  opacity: 0.86;
+}
+
+.branch-two {
+  stroke-dasharray: 13 17;
+}
+
+.branch-three {
+  stroke-dasharray: 10 15;
 }
 
 .map-node circle {
   fill: #fff8d5;
   stroke: #fff;
-  stroke-width: 8;
-  filter: drop-shadow(0 8px 0 rgba(76, 116, 80, 0.25));
+  stroke-width: 6;
+  filter: drop-shadow(0 6px 0 rgba(76, 116, 80, 0.22));
 }
 
 .map-node text,
@@ -1050,8 +1062,8 @@ button {
 
 .map-location {
   position: absolute;
-  width: min(22%, 220px);
-  min-height: 190px;
+  width: min(21%, 210px);
+  min-height: 182px;
   display: grid;
   grid-template-columns: 1fr;
   align-items: end;
@@ -1078,31 +1090,31 @@ button {
 }
 
 .location-1 {
-  top: 148px;
-  left: 6%;
+  top: 205px;
+  left: 8%;
   transform: rotate(-2deg);
 }
 
 .location-2 {
-  top: 88px;
-  left: 31%;
+  top: 92px;
+  left: 29%;
   transform: rotate(2deg);
 }
 
 .location-3 {
-  top: 255px;
-  left: 41%;
+  top: 238px;
+  left: 45%;
 }
 
 .location-4 {
-  top: 118px;
-  right: 8%;
+  top: 108px;
+  right: 10%;
   transform: rotate(1deg);
 }
 
 .location-5 {
-  right: 5%;
-  bottom: 52px;
+  right: 8%;
+  bottom: 42px;
   transform: rotate(-1deg);
 }
 
@@ -1124,42 +1136,48 @@ button {
 
 .map-pin {
   position: absolute;
-  top: 18px;
+  top: 10px;
   left: 50%;
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   display: grid;
   place-items: center;
   border: 3px solid #fff;
-  border-radius: 50% 50% 50% 8px;
+  border-radius: 50%;
   color: #fff;
   background: var(--hall-color);
   box-shadow: 0 5px 10px rgba(40, 54, 49, 0.16);
-  font: 800 14px "Baloo 2", sans-serif;
-  transform: translateX(-68px) rotate(-45deg);
+  font: 900 12px "Baloo 2", sans-serif;
+  transform: translateX(-62px) rotate(-10deg);
 }
 
 .map-pin::first-letter {
-  transform: rotate(45deg);
+  transform: none;
 }
 
 .hall-art {
   position: relative;
-  width: 104px;
-  height: 116px;
+  width: 112px;
+  height: 122px;
   display: grid;
   flex: 0 0 auto;
   place-items: center;
-  border: 5px solid rgba(255, 255, 255, 0.94);
-  border-radius: 52px 52px 25px 25px;
+  border: 6px solid rgba(255, 255, 255, 0.96);
+  border-radius: 56px 56px 27px 27px;
   background:
+    radial-gradient(circle at 78% 16%, rgba(255, 255, 255, 0.88) 0 7%, transparent 7.5%),
     radial-gradient(circle at 50% 35%, #fff 0 10%, transparent 11%),
     linear-gradient(160deg, color-mix(in srgb, var(--hall-color) 18%, white), color-mix(in srgb, var(--hall-color) 45%, white));
   box-shadow:
     inset 0 -10px 0 rgba(255, 255, 255, 0.36),
+    0 0 0 4px color-mix(in srgb, var(--hall-color) 18%, transparent),
     0 12px 0 color-mix(in srgb, var(--hall-color) 48%, #37566e),
     0 18px 24px rgba(37, 82, 70, 0.28);
-  font-size: 50px;
+  font-size: 52px;
+}
+
+.hall-art::selection {
+  background: transparent;
 }
 
 .hall-art::before,
@@ -1185,7 +1203,9 @@ button {
   position: relative;
   z-index: 1;
   font-style: normal;
-  filter: drop-shadow(0 4px 2px rgba(44, 42, 90, 0.15));
+  filter:
+    drop-shadow(0 4px 2px rgba(44, 42, 90, 0.15))
+    drop-shadow(0 -2px 0 rgba(255, 255, 255, 0.6));
 }
 
 .hall-copy {
@@ -1201,8 +1221,9 @@ button {
 
 .hall-copy strong {
   color: var(--hall-color);
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.25;
+  letter-spacing: 0.01em;
   text-shadow:
     0 2px 0 #fff,
     2px 0 0 #fff,
@@ -1212,7 +1233,7 @@ button {
 
 .hall-copy small {
   color: #38505a;
-  font-size: 10px;
+  font-size: 10.5px;
   line-height: 1.5;
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.9);
 }
@@ -1220,10 +1241,11 @@ button {
 .hall-copy em {
   width: max-content;
   margin-top: 4px;
-  padding: 4px 8px;
+  padding: 3px 8px;
   border-radius: 99px;
-  color: #fff;
-  background: var(--hall-color);
+  color: var(--hall-color);
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 3px 0 color-mix(in srgb, var(--hall-color) 20%, transparent);
   font-size: 10px;
   font-style: normal;
   font-weight: 900;
