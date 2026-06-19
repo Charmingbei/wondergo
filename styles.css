@@ -900,20 +900,104 @@ button {
 }
 
 .map-path {
+  display: none;
+}
+
+.training-map-illustration {
   position: absolute;
   z-index: 2;
-  top: 270px;
-  left: 10%;
-  width: 78%;
-  height: 410px;
-  border: 13px dashed rgba(255, 244, 186, 0.98);
-  border-top-color: transparent;
-  border-left-color: transparent;
-  border-radius: 48% 55% 46% 52%;
-  transform: rotate(7deg);
-  filter:
-    drop-shadow(0 4px 0 rgba(57, 126, 86, 0.2))
-    drop-shadow(0 0 10px rgba(255, 255, 255, 0.55));
+  inset: 190px 24px 42px;
+  width: calc(100% - 48px);
+  height: calc(100% - 232px);
+  pointer-events: none;
+  filter: drop-shadow(0 18px 20px rgba(43, 84, 93, 0.16));
+}
+
+.map-coast {
+  fill: url(#questIsland);
+  stroke: rgba(255, 255, 255, 0.9);
+  stroke-width: 14;
+  filter: url(#mapSoftShadow);
+}
+
+.coast-left,
+.coast-right {
+  opacity: 0.72;
+}
+
+.quest-route-shadow {
+  fill: none;
+  stroke: rgba(82, 112, 76, 0.22);
+  stroke-width: 34;
+  stroke-linecap: round;
+}
+
+.quest-route {
+  fill: none;
+  stroke: url(#questRoute);
+  stroke-width: 17;
+  stroke-dasharray: 18 18;
+  stroke-linecap: round;
+  filter: drop-shadow(0 5px 0 rgba(116, 139, 82, 0.22));
+}
+
+.map-node circle {
+  fill: #fff8d5;
+  stroke: #fff;
+  stroke-width: 8;
+  filter: drop-shadow(0 8px 0 rgba(76, 116, 80, 0.25));
+}
+
+.map-node text,
+.map-goal text {
+  fill: #5639d8;
+  font-family: "Baloo 2", "Noto Sans TC", sans-serif;
+  font-size: 20px;
+  font-weight: 900;
+  text-anchor: middle;
+}
+
+.node-start circle {
+  fill: #ffe278;
+}
+
+.node-start text {
+  font-size: 13px;
+}
+
+.map-goal path {
+  fill: #fff2a9;
+  stroke: #fff;
+  stroke-width: 8;
+  filter: drop-shadow(0 9px 0 rgba(86, 57, 216, 0.2));
+}
+
+.map-goal text {
+  font-size: 18px;
+}
+
+.map-mountains path {
+  fill: #8f8274;
+  stroke: #fff;
+  stroke-width: 6;
+  opacity: 0.78;
+}
+
+.map-forest circle {
+  fill: #277f4b;
+  stroke: rgba(255, 255, 255, 0.75);
+  stroke-width: 5;
+}
+
+.map-forest rect {
+  fill: #8a603a;
+}
+
+.map-lake {
+  fill: #6ad6f4;
+  stroke: rgba(255, 255, 255, 0.78);
+  stroke-width: 9;
+  opacity: 0.86;
 }
 
 .map-locations {
@@ -959,8 +1043,8 @@ button {
 
 .map-location {
   position: absolute;
-  width: min(28%, 285px);
-  min-height: 154px;
+  width: min(25%, 260px);
+  min-height: 145px;
   display: grid;
   grid-template-columns: 82px 1fr;
   align-items: center;
@@ -994,31 +1078,31 @@ button {
 }
 
 .location-1 {
-  top: 58px;
-  left: 4%;
+  top: 148px;
+  left: 6%;
   transform: rotate(-2deg);
 }
 
 .location-2 {
-  top: 82px;
-  right: 4%;
+  top: 88px;
+  left: 31%;
   transform: rotate(2deg);
 }
 
 .location-3 {
   top: 255px;
-  left: 36%;
+  left: 41%;
 }
 
 .location-4 {
-  bottom: 34px;
-  left: 6%;
+  top: 118px;
+  right: 8%;
   transform: rotate(1deg);
 }
 
 .location-5 {
-  right: 6%;
-  bottom: 34px;
+  right: 5%;
+  bottom: 52px;
   transform: rotate(-1deg);
 }
 
