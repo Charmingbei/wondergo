@@ -937,14 +937,14 @@ function renderTrainingMap(user) {
         <path class="map-coast coast-main" d="M92 365 C68 270 145 205 245 222 C318 114 445 101 515 184 C616 128 745 162 782 258 C902 264 970 345 925 440 C866 554 635 530 510 496 C382 560 170 532 92 365 Z" />
         <path class="map-coast coast-left" d="M35 438 C75 386 155 385 210 429 C172 500 78 506 35 438 Z" />
         <path class="map-coast coast-right" d="M812 122 C870 82 951 104 982 170 C934 215 842 206 812 122 Z" />
-        <path class="quest-route-shadow main-route" d="M115 372 C205 300 260 255 360 266 C455 278 482 198 570 226 C654 252 704 208 782 260 C842 300 858 358 922 396" />
-        <path class="quest-route main-route" d="M115 372 C205 300 260 255 360 266 C455 278 482 198 570 226 C654 252 704 208 782 260 C842 300 858 358 922 396" />
-        <path class="quest-route-shadow branch-route branch-one" d="M355 268 C302 332 238 358 170 430" />
-        <path class="quest-route branch-route branch-one" d="M355 268 C302 332 238 358 170 430" />
-        <path class="quest-route-shadow branch-route branch-two" d="M575 226 C560 318 626 382 720 390" />
-        <path class="quest-route branch-route branch-two" d="M575 226 C560 318 626 382 720 390" />
-        <path class="quest-route-shadow branch-route branch-three" d="M780 260 C812 190 870 166 942 146" />
-        <path class="quest-route branch-route branch-three" d="M780 260 C812 190 870 166 942 146" />
+        <path class="quest-route-shadow main-route" d="M112 374 C188 318 242 276 335 286 C436 296 468 206 555 232 C640 257 684 205 774 250 C848 287 858 356 920 398" />
+        <path class="quest-route main-route" d="M112 374 C188 318 242 276 335 286 C436 296 468 206 555 232 C640 257 684 205 774 250 C848 287 858 356 920 398" />
+        <path class="quest-route-shadow branch-route branch-one" d="M338 286 C300 330 248 365 168 428" />
+        <path class="quest-route branch-route branch-one" d="M338 286 C300 330 248 365 168 428" />
+        <path class="quest-route-shadow branch-route branch-two" d="M558 232 C540 304 598 366 718 394" />
+        <path class="quest-route branch-route branch-two" d="M558 232 C540 304 598 366 718 394" />
+        <path class="quest-route-shadow branch-route branch-three" d="M774 250 C810 202 868 176 940 146" />
+        <path class="quest-route branch-route branch-three" d="M774 250 C810 202 868 176 940 146" />
         <g class="map-node node-start"><circle cx="115" cy="372" r="24" /><text x="115" y="379">GO</text></g>
         <g class="map-node"><circle cx="250" cy="288" r="13" /></g>
         <g class="map-node"><circle cx="412" cy="260" r="13" /></g>

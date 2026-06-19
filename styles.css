@@ -847,18 +847,17 @@ button {
   align-items: flex-start;
   justify-content: space-between;
   gap: 20px;
-  padding: 20px 22px;
-  border: 2px solid rgba(112, 77, 35, 0.12);
-  border-radius: 26px;
-  background: rgba(255, 253, 238, 0.78);
-  box-shadow: 0 14px 30px rgba(80, 71, 126, 0.1);
-  backdrop-filter: blur(6px);
+  padding: 4px 8px 0;
 }
 
 .map-heading h2 {
   margin: 12px 0 5px;
   font-size: clamp(28px, 4vw, 43px);
   letter-spacing: -1.5px;
+  text-shadow:
+    0 3px 0 rgba(255, 255, 255, 0.9),
+    3px 0 0 rgba(255, 255, 255, 0.86),
+    -3px 0 0 rgba(255, 255, 255, 0.86);
 }
 
 .map-heading p {
@@ -866,6 +865,7 @@ button {
   margin: 0;
   color: #35546f;
   line-height: 1.7;
+  text-shadow: 0 2px 0 rgba(255, 255, 255, 0.72);
 }
 
 .toki-guide {
@@ -885,10 +885,10 @@ button {
   width: 150px;
   margin: 0 0 6px auto;
   padding: 9px 12px;
-  border: 3px solid #49339f;
+  border: 3px solid rgba(73, 51, 159, 0.86);
   border-radius: 16px 16px 4px 16px;
   color: #49339f;
-  background: #fff;
+  background: rgba(255, 255, 255, 0.78);
   box-shadow: 0 7px 0 rgba(63, 44, 147, 0.16);
   font-size: 12px;
   font-weight: 900;
@@ -935,15 +935,15 @@ button {
 .quest-route-shadow {
   fill: none;
   stroke: rgba(82, 112, 76, 0.22);
-  stroke-width: 28;
+  stroke-width: 24;
   stroke-linecap: round;
 }
 
 .quest-route {
   fill: none;
   stroke: url(#questRoute);
-  stroke-width: 14;
-  stroke-dasharray: 20 20;
+  stroke-width: 12;
+  stroke-dasharray: 18 22;
   stroke-linecap: round;
   filter: drop-shadow(0 5px 0 rgba(116, 139, 82, 0.22));
 }
@@ -1077,11 +1077,12 @@ button {
   box-shadow: none;
   text-align: center;
   transition: 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transform: rotate(var(--tilt, 0deg));
 }
 
 .map-location:hover {
   z-index: 6;
-  transform: translateY(-9px) scale(1.045) rotate(-1deg);
+  transform: translateY(-9px) scale(1.045) rotate(var(--tilt, 0deg));
 }
 
 .map-location:focus-visible {
@@ -1090,32 +1091,33 @@ button {
 }
 
 .location-1 {
-  top: 205px;
-  left: 8%;
-  transform: rotate(-2deg);
+  --tilt: -5deg;
+  top: 212px;
+  left: 7%;
 }
 
 .location-2 {
-  top: 92px;
-  left: 29%;
-  transform: rotate(2deg);
+  --tilt: 3deg;
+  top: 86px;
+  left: 28%;
 }
 
 .location-3 {
-  top: 238px;
-  left: 45%;
+  --tilt: -1deg;
+  top: 248px;
+  left: 43%;
 }
 
 .location-4 {
-  top: 108px;
-  right: 10%;
-  transform: rotate(1deg);
+  --tilt: 5deg;
+  top: 122px;
+  right: 9%;
 }
 
 .location-5 {
-  right: 8%;
-  bottom: 42px;
-  transform: rotate(-1deg);
+  --tilt: -3deg;
+  right: 7%;
+  bottom: 38px;
 }
 
 .hall-island {
