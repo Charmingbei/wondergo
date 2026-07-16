@@ -1,0 +1,25 @@
+{
+  "name": "WonderGo 玩得夠",
+  "short_name": "WonderGo",
+  "description": "免註冊、班級碼登入的英語聽說讀寫遊戲化學習 PWA。",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f7fbff",
+  "theme_color": "#7cc7c9",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "../assets/ip-avatar.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "../assets/ip-guide.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

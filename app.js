@@ -722,6 +722,7 @@ function renderPlayerHome(user) {
     ${playerHeader(user, `嗨，${escapeHTML(user.account)}！`, "今天也和 Toki 一起前進一點吧。")}
     ${renderPlayerMomentum(user)}
     ${renderLevelJourney(user)}
+    ${renderDailyAdventureRhythm(user)}
     ${renderAutonomousChallengeHub(user)}
     ${renderTrainingMap(user)}
     ${renderPlayerAssignments()}
@@ -733,6 +734,78 @@ function renderPlayerHome(user) {
 function levelForXp(xp) {
   return [...levelMilestones].reverse().find((milestone) => xp >= milestone.xp)
     || levelMilestones[0];
+}
+
+function renderDailyAdventureRhythm(user) {
+  const pendingAssignments = playerAssignments.filter((item) => !item.completion);
+  const wrongCount = wrongBookItems(user).length;
+  const actualAbilities = playerAbilities(user);
+  const weakest = [...actualAbilities].sort((a, b) => a.value - b.value)[0];
+  const xp = Number(user.xp || 0);
+  const next = levelMilestones.find((milestone) => milestone.xp > xp);
+  const firstWinReady = (user.weeklySummary?.completedTasks || 0) === 0;
+  const dailySteps = [
+    {
+      tag: "STEP 1",
+      title: wrongCount ? "先清今日複習" : "先完成暖身任務",
+      body: wrongCount
+        ? `錯題本有 ${wrongCount} 題可複習，先把容易忘的內容拉回來。`
+        : "目前沒有錯題，先挑一座訓練館完成 10 題，建立今天的學習紀錄。",
+      action: wrongCount ? "前往錯題本" : "前往訓練館",
+      attr: wrongCount ? 'data-page="wrongbook"' : 'data-page="training"',
+      buttonClass: "secondary-btn",
+      icon: wrongCount ? "▣" : "✦",
+    },
+    {
+      tag: "STEP 2",
+      title: firstWinReady ? "拿下每日首勝" : "延續今日戰績",
+      body: firstWinReady
+        ? "今天第一場完成後會成為本日學習起點，讓連續學習更有感。"
+        : `本週已完成 ${user.weeklySummary?.completedTasks || 0} 次任務，可以再挑戰一場。`,
+      action: "開始今日建議",
+      attr: `data-ability="${weakest.id}"`,
+      buttonClass: "primary-btn autonomy-start",
+      icon: "★",
+    },
+    {
+      tag: "STEP 3",
+      title: pendingAssignments.length ? "完成老師任務" : "收集主題徽章",
+      body: pendingAssignments.length
+        ? `老師指派任務還有 ${pendingAssignments.length} 項，答對才會領到對應 XP。`
+        : "到世界地圖完成主題聽說讀寫關卡，解鎖可收藏的主題徽章。",
+      action: pendingAssignments.length ? "查看老師任務" : "前往世界地圖",
+      attr: pendingAssignments.length ? 'data-scroll-target="assigned-quests"' : 'data-page="world"',
+      buttonClass: pendingAssignments.length ? "secondary-btn" : "primary-btn",
+      icon: pendingAssignments.length ? "✓" : "🏅",
+    },
+  ];
+  return `
+    <section class="daily-rhythm">
+      <div class="daily-rhythm-head">
+        <div>
+          <span class="quest-eyebrow">TODAY'S ROUTE</span>
+          <h2>今日冒險節奏</h2>
+          <p>參考練功型 App 的節奏設計，WonderGo 會把「該複習、該挑戰、快升級」整理成今天最清楚的三步路線。</p>
+        </div>
+        <div class="unlock-preview">
+          <small>下一個解鎖目標</small>
+          <strong>${next ? `Lv.${next.level} ${next.title}` : "最高階挑戰"}</strong>
+          <span>${next ? `還差 ${next.xp - xp} XP` : "繼續累積徽章與精熟紀錄"}</span>
+        </div>
+      </div>
+      <div class="daily-rhythm-grid">
+        ${dailySteps.map((step, index) => `
+          <article class="rhythm-card rhythm-${index + 1}">
+            <span class="rhythm-icon">${step.icon}</span>
+            <div>
+              <small>${step.tag}</small>
+              <h3>${step.title}</h3>
+              <p>${step.body}</p>
+            </div>
+            <button class="${step.buttonClass}" ${step.attr}>${step.action}</button>
+          </article>`).join("")}
+      </div>
+    </section>`;
 }
 
 function renderPlayerMomentum(user) {
@@ -865,7 +938,7 @@ function renderPlayerAssignments() {
   const pending = playerAssignments.filter((item) => !item.completion);
   const completed = playerAssignments.filter((item) => item.completion);
   return `
-    <section class="assigned-quest-panel">
+    <section class="assigned-quest-panel" id="assigned-quests">
       <div class="section-title">
         <div><span class="quest-eyebrow">TEACHER QUEST</span><h2>老師指派任務</h2><p>${pending.length ? `還有 ${pending.length} 項任務等待完成。` : "本次指派任務都完成了！"}</p></div>
         <span class="quest-reward">${completed.length}／${playerAssignments.length} 已完成</span>
@@ -4556,6 +4629,11 @@ function bindEvents() {
     selectedWorldCountry = null;
     render();
     window.scrollTo({ top: 0, behavior: "smooth" });
+  }));
+
+  document.querySelectorAll("[data-scroll-target]").forEach((button) => button.addEventListener("click", () => {
+    const target = document.getElementById(button.dataset.scrollTarget);
+    if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
   }));
 
   document.getElementById("logout")?.addEventListener("click", async () => {
